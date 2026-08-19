@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Insight, PixelBar } from "../components/ui";
+import { lock } from "../components/PinGate";
 import { updateProfile, deleteProfile } from "../lib/store";
 import { ACTIVITY, GOALS, MEALS, targetsFor, ageFrom } from "../lib/nutrition";
 
@@ -55,6 +56,7 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
           <h2 style={{ fontSize: 20 }}>{f.name}</h2>
         </div>
         <button className="btn btn-sm btn-ghost" onClick={onSwitch}>Cambiar de perfil</button>
+        <button className="btn btn-sm btn-ghost" onClick={lock}>Cerrar la casa</button>
       </div>
 
       {/* --- identidad --- */}

@@ -308,32 +308,3 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
-
-/* --- candado de entrada --- */
-.pin-dots { display: flex; gap: 12px; }
-.pin-dots[data-error="true"] { animation: pin-shake .4s steps(3); }
-.pin-dot {
-  width: 16px; height: 16px;
-  background: var(--panel);
-  border: var(--px) solid var(--line);
-}
-.pin-dot[data-on="true"] { background: var(--sakura); border-color: #c76f8c; }
-
-.pin-pad { display: grid; grid-template-columns: repeat(3, 76px); gap: 12px; }
-.pin-key {
-  height: 62px;
-  font-family: var(--font-num); font-size: 22px;
-  color: var(--washi); background: var(--panel);
-  border: var(--px) solid var(--line);
-  cursor: pointer;
-}
-.pin-key:hover { background: var(--panel-2); }
-.pin-key:active { transform: translate(var(--px), var(--px)); }
-.pin-key:focus-visible { outline: var(--px) solid var(--lantern); outline-offset: 2px; }
-.pin-key-ghost { background: transparent; color: var(--muted); }
-
-@keyframes pin-shake {
-  0%, 100% { transform: translateX(0); }
-  33% { transform: translateX(-7px); }
-  66% { transform: translateX(7px); }
-}

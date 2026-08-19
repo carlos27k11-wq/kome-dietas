@@ -11,15 +11,18 @@ azúcares, grasa saturada y sodio. Registro de agua y de pasos (de mil en mil). 
 nutricionales. Copiar el día anterior de un toque.
 
 **Recetas** — Biblioteca de platos con foto grande; al pulsar se amplía. Cada receta se monta
-con ingredientes reales (búsqueda local + Open Food Facts) y la app calcula los macros por
-ración. Se marca a quién de la casa le gusta cada plato y se puede filtrar por persona o ver
+con ingredientes reales y la app calcula los macros por ración. Los ingredientes se añaden de
+tres maneras: buscándolos (despensa de casa + Open Food Facts), **escaneando el código de
+barras** con la cámara, o **creándolos a mano** con sus valores por 100 g cuando no están en
+ninguna base. Lo que creas queda guardado para toda la casa. Se marca a quién de la casa le gusta cada plato y se puede filtrar por persona o ver
 solo lo que gusta a todos. Se añaden al diario en un toque.
 
 **Plan** — Calendario semanal con comida y cena de cada día. Se eligen recetas (filtrando por
 quién se las come) o se apunta texto libre. Copia la semana anterior de un toque. Incluye la
 lista de la compra de la casa: apuntas lo que falte, se tacha al comprarlo y la ve toda la
 familia. También puedes traer los ingredientes de las recetas de la semana (sumados y con
-cantidades) o los de una receta suelta desde su ficha.
+cantidades) o los de una receta suelta desde su ficha, y **escanear productos con la cámara**
+para meterlos en la lista mientras vacías la despensa.
 
 **Registro** — Gráfico de kcal por día frente al objetivo (7 / 30 / 90 días), medias de macros,
 constancia, racha, balance energético acumulado y su equivalente en kg. Gráficos de agua y de
@@ -46,14 +49,13 @@ npm run dev
 1. Sube la carpeta a un repositorio de GitHub.
 2. En Netlify: **Add new site → Import an existing project** y elige el repo.
 3. Build command `npm run build`, publish directory `dist` (ya está en `netlify.toml`).
-4. En **Site configuration → Environment variables** añade:
-
-   | Variable | Valor |
-   |---|---|
-   | `VITE_SUPABASE_URL` | `https://qznmsqubnavzgyrnfgfr.supabase.co` |
-   | `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6bm1zcXVibmF2emd5cm5mZ2ZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwNzczODAsImV4cCI6MjEwMjY1MzM4MH0.IzYC2lsRK-CH2eYhTOAEhjL1NyhDsftGGnDU8pv4g44` |
+4. No hace falta tocar variables de entorno: las credenciales van en `.env.production`, que
+   Vite lee al compilar. Si algún día cambian, se ponen ahí o en **Site configuration →
+   Environment variables** como `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
 
 5. Deploy. El escáner de códigos necesita HTTPS: en Netlify ya lo es.
+
+Cada push a `main` vuelve a desplegar solo.
 
 ## Base de datos
 

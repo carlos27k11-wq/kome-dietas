@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet } from "../components/ui";
-import { searchOFF } from "../lib/off";
 import {
-  searchFoods, saveFood, saveRecipe, deleteRecipe, getRecipeIngredients,
+  saveFood, saveRecipe, deleteRecipe, getRecipeIngredients,
   toggleRecipeFavorite, addShoppingItems, fmtGrams,
 } from "../lib/store";
 import { uploadRecipePhoto } from "../lib/supabase";
 import { scaleFood } from "../lib/nutrition";
+import FoodFinder from "../components/FoodFinder";
 import { stripUi } from "../components/AddSheet";
 
 const CATS = [
@@ -25,41 +25,32 @@ const EMPTY = {
 
 /* ---------------- buscador de ingredientes ---------------- */
 function IngredientPicker({ onAdd }) {
-  const [q, setQ] = useState("");
-  const [res, setRes] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [sel, setSel] = useState(null);
   const [grams, setGrams] = useState(100);
 
-  useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) { setRes([]); return; }
-    const ctrl = new AbortController();
-    setLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const [a, b] = await Promise.all([
-          searchFoods(term, 8).catch(() => []),
-          searchOFF(term, { signal: ctrl.signal }).catch(() => []),
-        ]);
-        setRes([...a, ...b].slice(0, 20));
-      } finally { setLoading(false); }
-    }, 400);
-    return () => { clearTimeout(t); ctrl.abort(); };
-  }, [q]);
-
   if (sel) {
     const m = scaleFood(sel, grams);
+    const raciones = [30, 50, 100, 150, 200, Number(sel.default_serving_g) || 100]
+      .filter((v, i, a) => v > 0 && a.indexOf(v) === i)
+      .sort((a, b) => a - b);
     return (
       <div className="px" style={{ padding: 12 }}>
         <div className="row-b">
-          <strong style={{ fontFamily: "var(--font-display)", fontSize: 14 }}>{sel.name}</strong>
+          <div>
+            <strong style={{ fontFamily: "var(--font-display)", fontSize: 14 }}>{sel.name}</strong>
+            {sel.brand && <div className="tiny dim">{sel.brand}</div>}
+          </div>
           <button className="icon-btn" onClick={() => setSel(null)}>✕</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
           <input className="input num grow" type="number" inputMode="decimal" value={grams} min="0" step="5"
             onChange={(e) => setGrams(Math.max(0, Number(e.target.value)))} autoFocus />
           <span className="dim num">g</span>
+        </div>
+        <div className="chips" style={{ marginTop: 6 }}>
+          {raciones.map((g) => (
+            <button key={g} className="chip" data-on={grams === g} onClick={() => setGrams(g)}>{g} g</button>
+          ))}
         </div>
         <div className="tiny num dim" style={{ marginTop: 6 }}>
           {Math.round(m.kcal)} kcal · P{m.protein} C{m.carbs} G{m.fat}
@@ -69,7 +60,7 @@ function IngredientPicker({ onAdd }) {
             let food = sel;
             if (!food.id) { try { food = await saveFood(stripUi(food)); } catch { /* seguimos sin guardarlo */ } }
             onAdd({ food_id: food.id || null, name: sel.name, grams, ...m });
-            setSel(null); setQ(""); setRes([]); setGrams(100);
+            setSel(null); setGrams(100);
           }}>
           Añadir ingrediente
         </button>
@@ -78,20 +69,10 @@ function IngredientPicker({ onAdd }) {
   }
 
   return (
-    <div>
-      <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Busca un ingrediente…" />
-      {loading && <div className="tiny dim center blink" style={{ marginTop: 6 }}>buscando…</div>}
-      <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto" }}>
-        {res.map((f, i) => (
-          <button key={f.id || f.barcode || i} className="px"
-            onClick={() => { setSel(f); setGrams(Number(f.default_serving_g) || 100); }}
-            style={{ display: "block", width: "100%", textAlign: "left", padding: 8, marginBottom: 6, cursor: "pointer", border: "var(--px) solid var(--line-soft)" }}>
-            <div style={{ fontSize: 13 }}>{f.name} {f.brand && <span className="dim tiny">· {f.brand}</span>}</div>
-            <div className="tiny num dim">{Math.round(f.kcal_100)} kcal/100 g · P{f.protein_100} C{f.carbs_100} G{f.fat_100}</div>
-          </button>
-        ))}
-      </div>
-    </div>
+    <FoodFinder
+      placeholder="Busca un ingrediente…"
+      onPick={(f) => { setSel(f); setGrams(Number(f.default_serving_g) || 100); }}
+    />
   );
 }
 

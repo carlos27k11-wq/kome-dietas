@@ -1,11 +1,15 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Sheet } from "../components/ui";
+import { lookupBarcode } from "../lib/off";
 import {
   getPlan, addPlanItem, deletePlanItem, copyWeek, addEntries,
   listShopping, addShoppingItem, addShoppingItems, toggleShoppingItem, deleteShoppingItem,
   clearDoneShopping, planIngredients,
 } from "../lib/store";
 import { isoDate, shiftDate, mondayOf, WEEKDAYS, WEEKDAYS_JP } from "../lib/nutrition";
+
+// el lector pesa; solo se descarga si lo abres
+const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
 
 const SLOTS = [
   { key: "comida", label: "Comida", jp: "昼" },
@@ -105,6 +109,9 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(null); // ingredientes propuestos
   const [chosen, setChosen] = useState({});
+  const [scanning, setScanning] = useState(false);
+  const [scanKey, setScanKey] = useState(0);   // remontar el lector para el siguiente
+  const [scanMsg, setScanMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +121,7 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
   }, [toast]);
 
   useEffect(() => { if (open) load(); }, [open, load]);
-  useEffect(() => { if (!open) { setImporting(null); setChosen({}); } }, [open]);
+  useEffect(() => { if (!open) { setImporting(null); setChosen({}); setScanning(false); setScanMsg(""); } }, [open]);
 
   async function openImport() {
     try {
@@ -135,6 +142,26 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
     setImporting(null);
     load();
   }
+
+  // Escanear un producto y meterlo en la lista por su nombre
+  const onScan = useCallback(async (code) => {
+    if (!code) return;
+    setScanMsg(`Buscando ${code}…`);
+    try {
+      const found = await lookupBarcode(code);
+      const nombre = found ? found.name + (found.brand ? ` · ${found.brand}` : "") : "";
+      if (!nombre) {
+        setScanMsg(`El código ${code} no está en Open Food Facts. Apúntalo a mano.`);
+        return;
+      }
+      setItems((prev) => [...prev, { id: `tmp${Date.now()}`, text: nombre, done: false }]);
+      await addShoppingItem(nombre, profileId);
+      setScanMsg(`✓ ${nombre}`);
+      load();
+    } catch {
+      setScanMsg("Fallo al consultar el código. Prueba otra vez.");
+    }
+  }, [profileId, load]);
 
   async function add() {
     const t = text.trim();
@@ -210,9 +237,31 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
           Separa por comas para meter varias cosas de una vez. La lista es de toda la casa.
         </p>
 
-        <button className="btn btn-sm btn-ghost btn-block" onClick={openImport}>
-          ⤓ Traer ingredientes de la semana planificada
-        </button>
+        <div className="row">
+          <button className="btn btn-sm btn-ghost grow" onClick={openImport}>
+            ⤓ Ingredientes de la semana
+          </button>
+          <button className="btn btn-sm btn-ghost grow"
+            onClick={() => { setScanning((v) => !v); setScanMsg(""); }}>
+            {scanning ? "✕ Cerrar cámara" : "码 Escanear producto"}
+          </button>
+        </div>
+
+        {scanning && (
+          <div className="px" style={{ padding: 10 }}>
+            <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
+              <BarcodeScanner key={scanKey} onDetected={onScan} />
+            </Suspense>
+            {scanMsg && (
+              <p className="tiny" style={{ color: scanMsg.startsWith("✓") ? "var(--matcha)" : "var(--kaki)", marginBottom: 6 }}>
+                {scanMsg}
+              </p>
+            )}
+            <button className="btn btn-sm btn-block" onClick={() => { setScanKey((k) => k + 1); setScanMsg(""); }}>
+              Escanear otro
+            </button>
+          </div>
+        )}
 
         {loading && !items.length && <div className="center tiny dim blink">cargando…</div>}
 

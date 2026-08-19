@@ -23,7 +23,7 @@ function Nutriscore({ grade }) {
   );
 }
 
-function FoodRow({ food, onPick, badge }) {
+export function FoodRow({ food, onPick, badge }) {
   return (
     <button
       onClick={() => onPick(food)}

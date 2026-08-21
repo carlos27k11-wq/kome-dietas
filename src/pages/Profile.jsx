@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Insight, PixelBar } from "../components/ui";
+import AvatarPicker from "../components/AvatarPicker";
+import { Jp, THEMES, normalizeTheme, useTheme } from "../components/theme";
+import { AVATAR_COLORS } from "../lib/avatars";
 import { updateProfile, deleteProfile } from "../lib/store";
 import { ACTIVITY, GOALS, MEALS, targetsFor, ageFrom } from "../lib/nutrition";
 
-const EMOJIS = ["🍙", "🍣", "🐱", "🌸", "🍵", "🦊", "🌙", "🍜", "🐼", "🍡", "🐟", "🌿", "⛩️", "🍥", "🐧", "🍄"];
-
-export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, toast }) {
+export default function ProfilePage({ profile, onUpdate, onPreviewTheme, onSwitch, onDeleted, toast }) {
+  const { claro } = useTheme();
   const [f, setF] = useState(profile);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -13,6 +15,15 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
   useEffect(() => { setF(profile); setDirty(false); }, [profile]);
 
   const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); setDirty(true); };
+
+  // El tema se ve al momento aunque todavía no se haya guardado; si te
+  // vas de esta pantalla sin guardar, vuelve el que tenías.
+  const pickTheme = (t) => { set("theme", t); onPreviewTheme?.(t); };
+  const savedTheme = useRef(normalizeTheme(profile.theme));
+  const previewRef = useRef(onPreviewTheme);
+  useEffect(() => { savedTheme.current = normalizeTheme(profile.theme); }, [profile]);
+  useEffect(() => { previewRef.current = onPreviewTheme; }, [onPreviewTheme]);
+  useEffect(() => () => previewRef.current?.(savedTheme.current), []);
   const t = useMemo(() => targetsFor(f), [f]);
   const age = ageFrom(f.birth_date);
 
@@ -21,6 +32,7 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
     try {
       const patch = {
         name: f.name, avatar_emoji: f.avatar_emoji, color: f.color,
+        theme: normalizeTheme(f.theme),
         sex: f.sex, birth_date: f.birth_date || null,
         height_cm: f.height_cm ? Number(f.height_cm) : null,
         weight_kg: f.weight_kg ? Number(f.weight_kg) : null,
@@ -51,8 +63,8 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
     <div className="wrap stack" style={{ paddingTop: 12 }}>
       <div className="row-b">
         <div>
-          <div className="kanji">設定</div>
-          <h2 style={{ fontSize: 20 }}>{f.name}</h2>
+          <Jp>設定</Jp>
+          <h2 style={{ fontSize: 22 }}>{f.name}</h2>
         </div>
         <button className="btn btn-sm btn-ghost" onClick={onSwitch}>Cambiar de perfil</button>
       </div>
@@ -66,12 +78,68 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
             <input className="input" value={f.name} onChange={(e) => set("name", e.target.value)} />
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 5, marginTop: 10 }}>
-          {EMOJIS.map((e) => (
-            <button key={e} className="chip center" data-on={f.avatar_emoji === e} style={{ fontSize: 16, padding: 5 }}
-              onClick={() => set("avatar_emoji", e)}>{e}</button>
-          ))}
+        <div style={{ marginTop: 12 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Icono</div>
+          <AvatarPicker value={f.avatar_emoji} onChange={(e) => set("avatar_emoji", e)} />
         </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>Color del marco</div>
+          <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+            {AVATAR_COLORS.map((c) => (
+              <button key={c} onClick={() => set("color", c)} aria-label={`Color ${c}`}
+                style={{
+                  width: 34, height: 34, background: c, cursor: "pointer",
+                  borderRadius: 8,
+                  border: f.color === c ? "3px solid var(--washi)" : "3px solid var(--line)",
+                }} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* --- aspecto de la app --- */}
+      <div className="px" style={{ padding: 14 }}>
+        <div className="eyebrow" style={{ marginBottom: 4 }}>Aspecto de la app</div>
+        <p className="tiny dim" style={{ marginTop: 0 }}>
+          Cada persona de la casa tiene el suyo: al entrar con tu perfil se pone solo.
+        </p>
+        <div className="stack" style={{ gap: 10 }}>
+          {THEMES.map((t) => {
+            const on = normalizeTheme(f.theme) === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => pickTheme(t.key)}
+                className="px"
+                style={{
+                  display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+                  padding: 12, cursor: "pointer", color: "inherit",
+                  borderColor: on ? "var(--sakura)" : undefined,
+                }}
+              >
+                <span style={{ display: "flex", flexShrink: 0 }}>
+                  {t.swatch.map((c, i) => (
+                    <span key={i} style={{
+                      width: 16, height: 32, background: c,
+                      border: "1px solid var(--line)", marginLeft: i ? -1 : 0,
+                    }} />
+                  ))}
+                </span>
+                <span className="grow">
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600 }}>{t.label}</span>
+                  <span className="tiny dim" style={{ display: "block" }}>{t.hint}</span>
+                </span>
+                <span className="num" style={{ color: on ? "var(--sakura)" : "var(--muted-2)", fontSize: 20 }}>
+                  {on ? "●" : "○"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {dirty && normalizeTheme(f.theme) !== normalizeTheme(profile.theme) && (
+          <Insight tone="info" text="Estás viendo el tema nuevo. Se queda fijo cuando guardes los cambios abajo." />
+        )}
       </div>
 
       {/* --- datos --- */}
@@ -247,7 +315,7 @@ export default function ProfilePage({ profile, onUpdate, onSwitch, onDeleted, to
       </button>
 
       <p className="tiny center" style={{ color: "var(--muted-2)", paddingBottom: 10 }}>
-        米 kome · datos de alimentos de Open Food Facts (ODbL)
+        {claro ? "kome" : "米 kome"} · datos de alimentos de Open Food Facts (ODbL)
       </p>
     </div>
   );

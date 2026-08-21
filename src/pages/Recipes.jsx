@@ -1,13 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sheet } from "../components/ui";
+import { useTheme, Jp } from "../components/theme";
 import {
   saveFood, saveRecipe, deleteRecipe, getRecipeIngredients,
   toggleRecipeFavorite, addShoppingItems, fmtGrams,
+  searchFoods, recentFoods, findFoodByBarcode,
 } from "../lib/store";
 import { uploadRecipePhoto } from "../lib/supabase";
+import { searchOFF, lookupBarcode } from "../lib/off";
 import { scaleFood } from "../lib/nutrition";
-import FoodFinder from "../components/FoodFinder";
 import { stripUi } from "../components/AddSheet";
+import IngredientsTab from "./Ingredients";
+
+// el lector de códigos pesa; solo se descarga cuando se abre la cámara
+const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
 
 const CATS = [
   { key: "todas", label: "Todas", jp: "全" },
@@ -23,11 +29,98 @@ const EMPTY = {
   servings: 2, prep_min: "", tags: [], liked_by: [],
 };
 
-/* ---------------- buscador de ingredientes ---------------- */
+/* ============================================================
+   Buscador de ingredientes para la receta.
+   Dos formas de encontrar algo: escribiendo el nombre o
+   apuntando con la cámara al código de barras. Busca primero
+   en la despensa de casa y, si no está, en Open Food Facts.
+   ============================================================ */
+function IngredientRow({ f, badge, onPick }) {
+  return (
+    <button
+      onClick={() => onPick(f)}
+      className="px"
+      style={{
+        display: "flex", gap: 10, alignItems: "center", width: "100%", textAlign: "left",
+        padding: 9, cursor: "pointer", marginBottom: 8, color: "inherit",
+      }}
+    >
+      {f.image_url ? (
+        <img src={f.image_url} alt="" width={40} height={40} style={{ objectFit: "cover", background: "var(--night)" }} loading="lazy" />
+      ) : (
+        <div style={{ width: 40, height: 40, background: "var(--night)", display: "grid", placeItems: "center", fontSize: 18 }}>🥄</div>
+      )}
+      <div className="grow">
+        <div style={{ fontSize: 15, lineHeight: 1.25 }}>{f.name}</div>
+        <div className="tiny dim">
+          {f.brand ? `${f.brand} · ` : ""}<span className="num">{Math.round(f.kcal_100)} kcal/100 g</span>
+          {badge ? ` · ${badge}` : ""}
+        </div>
+      </div>
+      <span className="num" style={{ color: "var(--sakura)" }}>＋</span>
+    </button>
+  );
+}
+
 function IngredientPicker({ onAdd }) {
   const [sel, setSel] = useState(null);
   const [grams, setGrams] = useState(100);
+  const [q, setQ] = useState("");
+  const [mine, setMine] = useState([]);
+  const [off, setOff] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [cam, setCam] = useState(false);
+  const [scanKey, setScanKey] = useState(0);
+  const [scanMsg, setScanMsg] = useState("");
 
+  useEffect(() => { recentFoods(8).then(setMine).catch(() => {}); }, []);
+
+  useEffect(() => {
+    if (sel) return;
+    const term = q.trim();
+    if (term.length < 2) {
+      setOff([]);
+      recentFoods(8).then(setMine).catch(() => {});
+      return;
+    }
+    const ctrl = new AbortController();
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const [local, remote] = await Promise.all([
+          searchFoods(term, 10).catch(() => []),
+          searchOFF(term, { signal: ctrl.signal }).catch(() => []),
+        ]);
+        setMine(local);
+        const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+        setOff(remote.filter((r) => !codes.has(r.barcode)));
+      } finally { setLoading(false); }
+    }, 420);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [q, sel]);
+
+  const choose = useCallback((f) => {
+    setSel(f);
+    setGrams(Number(f.default_serving_g) || 100);
+    setCam(false);
+    setScanMsg("");
+  }, []);
+
+  const onScan = useCallback(async (code) => {
+    if (!code) return;
+    setScanMsg(`Leyendo el código ${code}…`);
+    try {
+      const local = await findFoodByBarcode(code);
+      if (local) { choose(local); return; }
+      const found = await lookupBarcode(code);
+      if (found) { choose(found); return; }
+      setScanMsg(`El código ${code} no está en ninguna base. Créalo en la pestaña de Ingredientes.`);
+    } catch {
+      setScanMsg("Fallo al consultar el código. Prueba otra vez.");
+    }
+  }, [choose]);
+
+  /* --- ya hay ingrediente elegido: solo falta la cantidad --- */
   if (sel) {
     const m = scaleFood(sel, grams);
     const raciones = [30, 50, 100, 150, 200, Number(sel.default_serving_g) || 100]
@@ -37,14 +130,14 @@ function IngredientPicker({ onAdd }) {
       <div className="px" style={{ padding: 12 }}>
         <div className="row-b">
           <div>
-            <strong style={{ fontFamily: "var(--font-display)", fontSize: 14 }}>{sel.name}</strong>
+            <strong style={{ fontFamily: "var(--font-display)", fontSize: 15 }}>{sel.name}</strong>
             {sel.brand && <div className="tiny dim">{sel.brand}</div>}
           </div>
-          <button className="icon-btn" onClick={() => setSel(null)}>✕</button>
+          <button className="icon-btn" onClick={() => setSel(null)} aria-label="Elegir otro">✕</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
           <input className="input num grow" type="number" inputMode="decimal" value={grams} min="0" step="5"
-            onChange={(e) => setGrams(Math.max(0, Number(e.target.value)))} autoFocus />
+            onChange={(e) => setGrams(Math.max(0, Number(e.target.value)))} />
           <span className="dim num">g</span>
         </div>
         <div className="chips" style={{ marginTop: 6 }}>
@@ -60,7 +153,7 @@ function IngredientPicker({ onAdd }) {
             let food = sel;
             if (!food.id) { try { food = await saveFood(stripUi(food)); } catch { /* seguimos sin guardarlo */ } }
             onAdd({ food_id: food.id || null, name: sel.name, grams, ...m });
-            setSel(null); setGrams(100);
+            setSel(null); setGrams(100); setQ("");
           }}>
           Añadir ingrediente
         </button>
@@ -68,11 +161,61 @@ function IngredientPicker({ onAdd }) {
     );
   }
 
+  /* --- buscador --- */
   return (
-    <FoodFinder
-      placeholder="Busca un ingrediente…"
-      onPick={(f) => { setSel(f); setGrams(Number(f.default_serving_g) || 100); }}
-    />
+    <div className="stack">
+      <div className="row">
+        <input
+          className="input grow"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Busca un ingrediente…"
+        />
+        <button
+          className="btn"
+          onClick={() => { setCam((v) => !v); setScanMsg(""); setScanKey((k) => k + 1); }}
+          aria-label={cam ? "Cerrar la cámara" : "Escanear código de barras"}
+          title="Escanear código de barras"
+        >
+          {cam ? "✕" : "📷"}
+        </button>
+      </div>
+
+      {cam && (
+        <div className="px" style={{ padding: 10 }}>
+          <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
+            <BarcodeScanner key={scanKey} onDetected={onScan} />
+          </Suspense>
+          {scanMsg && <p className="tiny" style={{ color: "var(--kaki)", margin: "6px 0" }}>{scanMsg}</p>}
+          <button className="btn btn-sm btn-block" onClick={() => { setScanKey((k) => k + 1); setScanMsg(""); }}>
+            Volver a escanear
+          </button>
+        </div>
+      )}
+
+      {loading && <div className="tiny dim center blink">buscando…</div>}
+
+      <div style={{ maxHeight: "42vh", overflowY: "auto" }}>
+        {mine.length > 0 && (
+          <>
+            <div className="eyebrow">{q.trim().length < 2 ? "Lo que más usáis" : "En vuestra despensa"}</div>
+            {mine.map((f) => <IngredientRow key={f.id} f={f} onPick={choose} />)}
+          </>
+        )}
+        {off.length > 0 && (
+          <>
+            <div className="eyebrow">Open Food Facts</div>
+            {off.map((f, i) => <IngredientRow key={f.barcode || i} f={f} badge="nuevo" onPick={choose} />)}
+          </>
+        )}
+      </div>
+
+      {!loading && q.trim().length >= 2 && !mine.length && !off.length && (
+        <div className="empty tiny">
+          Sin resultados. Créalo en la pestaña <strong>Ingredientes</strong> y aparecerá aquí.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -187,13 +330,17 @@ function RecipeEditor({ open, initial, onClose, onSaved, toast, profiles = [] })
           {ings.map((i, idx) => (
             <div key={idx} className="entry">
               <div className="grow">
-                <div style={{ fontSize: 14 }}>{i.name}</div>
+                <div style={{ fontSize: 15 }}>{i.name}</div>
                 <div className="tiny num dim">{Math.round(i.grams)} g · {Math.round(i.kcal)} kcal</div>
               </div>
               <button className="icon-btn" onClick={() => setIngs(ings.filter((_, j) => j !== idx))} aria-label="Quitar">✕</button>
             </div>
           ))}
-          {!ings.length && <p className="tiny dim">Añade ingredientes y la app calcula los macros por ración.</p>}
+          {!ings.length && (
+            <p className="tiny dim">
+              Búscalos por el nombre o escanea el código de barras. La app calcula sola los macros por ración.
+            </p>
+          )}
           <div style={{ marginTop: 8 }}>
             <IngredientPicker onAdd={(ing) => setIngs([...ings, ing])} />
           </div>
@@ -360,8 +507,9 @@ function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profil
   );
 }
 
-/* ---------------- página ---------------- */
-export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
+/* ---------------- listado de recetas ---------------- */
+function RecipeList({ recipes, reload, toast, profiles }) {
+  const { jpLabel } = useTheme();
   const [cat, setCat] = useState("todas");
   const [who, setWho] = useState("todos");
   const [q, setQ] = useState("");
@@ -384,21 +532,16 @@ export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
   }, [recipes, cat, q, who, profiles]);
 
   return (
-    <div className="wrap stack" style={{ paddingTop: 12 }}>
-      <div className="row-b">
-        <div>
-          <div className="kanji">献立帳</div>
-          <h2 style={{ fontSize: 20 }}>Recetario</h2>
-        </div>
-        <button className="btn btn-primary btn-sm" onClick={() => setEditing({})}>＋ Nueva</button>
+    <div className="stack">
+      <div className="row" style={{ gap: 8 }}>
+        <input className="input grow" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar receta…" />
+        <button className="btn btn-primary" onClick={() => setEditing({})}>＋ Nueva</button>
       </div>
-
-      <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar receta…" />
 
       <div className="chips">
         {CATS.map((c) => (
           <button key={c.key} className="chip" data-on={cat === c.key} onClick={() => setCat(c.key)}>
-            {c.jp} {c.label}
+            {jpLabel(c.jp, c.label)}
           </button>
         ))}
       </div>
@@ -432,12 +575,12 @@ export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
               <div className="thumb" style={{ display: "grid", placeItems: "center", fontSize: 30 }}>🍚</div>
             )}
             <div className="meta">
-              <div style={{ fontSize: 13, lineHeight: 1.25 }}>
+              <div style={{ fontSize: 14, lineHeight: 1.25 }}>
                 {r.is_favorite && <span style={{ color: "var(--lantern)" }}>★ </span>}{r.name}
               </div>
               <div className="tiny num" style={{ color: "var(--muted-2)" }}>{Math.round(r.kcal)} kcal · P{Math.round(r.protein)}</div>
               {r.liked_by?.length > 0 && (
-                <div style={{ fontSize: 11, marginTop: 2 }}>
+                <div style={{ fontSize: 14, marginTop: 2 }}>
                   {profiles.filter((p) => r.liked_by.includes(p.id)).map((p) => p.avatar_emoji).join(" ")}
                 </div>
               )}
@@ -463,6 +606,36 @@ export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
           <button className="btn btn-sm" style={{ position: "absolute", top: 16, right: 16 }} onClick={() => setZoom(null)}>Cerrar</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ---------------- página con sus dos subpestañas ---------------- */
+export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
+  const [sub, setSub] = useState("recetas");
+
+  return (
+    <div className="wrap stack" style={{ paddingTop: 12 }}>
+      <div>
+        <Jp>献立帳</Jp>
+        <h2 style={{ fontSize: 22 }}>Recetario</h2>
+      </div>
+
+      {/* subpestañas: las recetas y la despensa de ingredientes */}
+      <div className="subtabs" role="tablist">
+        <button className="subtab" role="tab" aria-selected={sub === "recetas"}
+          data-on={sub === "recetas"} onClick={() => setSub("recetas")}>
+          Recetas
+        </button>
+        <button className="subtab" role="tab" aria-selected={sub === "ingredientes"}
+          data-on={sub === "ingredientes"} onClick={() => setSub("ingredientes")}>
+          Ingredientes
+        </button>
+      </div>
+
+      {sub === "recetas"
+        ? <RecipeList recipes={recipes} reload={reload} toast={toast} profiles={profiles} />
+        : <IngredientsTab toast={toast} />}
     </div>
   );
 }

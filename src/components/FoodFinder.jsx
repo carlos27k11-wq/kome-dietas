@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { useTheme } from "./theme";
 import { searchOFF, lookupBarcode } from "../lib/off";
 import { searchFoods, recentFoods, saveFood, findFoodByBarcode } from "../lib/store";
 import { FoodRow, stripUi } from "./AddSheet";
@@ -77,7 +78,7 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
 
       <div className="field">
         <label>Nombre</label>
-        <input className="input" value={f.name} onChange={set("name")} placeholder="Tofu firme" autoFocus />
+        <input className="input" value={f.name} onChange={set("name")} placeholder="Tofu firme" />
       </div>
       <div className="field">
         <label>Marca <span className="dim">— opcional</span></label>
@@ -135,6 +136,7 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
    qué hacer con él (ración, ingrediente, lista de la compra).
    ============================================================ */
 export default function FoodFinder({ onPick, placeholder = "Busca un alimento…" }) {
+  const { jpLabel } = useTheme();
   const [tab, setTab] = useState("buscar");
   const [q, setQ] = useState("");
   const [mine, setMine] = useState([]);
@@ -195,7 +197,7 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
         {TABS.map((t) => (
           <button key={t.key} className="chip" data-on={tab === t.key}
             onClick={() => { setTab(t.key); setScanMsg(""); }}>
-            {t.jp} {t.label}
+            {jpLabel(t.jp, t.label)}
           </button>
         ))}
       </div>

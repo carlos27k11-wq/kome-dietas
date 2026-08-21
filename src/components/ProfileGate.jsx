@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { Sheet } from "./ui";
+import AvatarPicker from "./AvatarPicker";
+import { useTheme, THEMES, normalizeTheme } from "./theme";
+import { AVATAR_COLORS as COLORS } from "../lib/avatars";
 import { createProfile } from "../lib/store";
-
-const EMOJIS = ["🍙", "🍣", "🐱", "🌸", "🍵", "🦊", "🌙", "🍜", "🐼", "🍡", "🐟", "🌿", "⛩️", "🍥", "🐧", "🍄"];
-const COLORS = ["#f09bb6", "#f0c069", "#79b0dc", "#9cc97f", "#b98ce0", "#e5875e"];
 
 /* Farolillos de píxel: fila decorativa sobre el título */
 function Lanterns() {
@@ -31,10 +31,12 @@ function Lanterns() {
 }
 
 export default function ProfileGate({ profiles, onPick, onCreated }) {
+  const { theme, claro } = useTheme();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🍙");
+  const [emoji, setEmoji] = useState("🙂");
   const [color, setColor] = useState(COLORS[0]);
+  const [look, setLook] = useState(theme);
   const [busy, setBusy] = useState(false);
 
   async function create() {
@@ -43,9 +45,10 @@ export default function ProfileGate({ profiles, onPick, onCreated }) {
     try {
       const p = await createProfile({
         name: name.trim(), avatar_emoji: emoji, color,
+        theme: normalizeTheme(look),
         sort_order: profiles.length,
       });
-      setOpen(false); setName(""); setEmoji("🍙");
+      setOpen(false); setName(""); setEmoji("🙂");
       onCreated(p);
     } finally { setBusy(false); }
   }
@@ -53,9 +56,13 @@ export default function ProfileGate({ profiles, onPick, onCreated }) {
   return (
     <div className="gate">
       <div className="center">
-        <Lanterns />
-        <div className="kanji" style={{ marginTop: 6 }}>今日は誰が食べる</div>
-        <h1 style={{ fontSize: 26, marginTop: 6 }}>¿Quién come hoy?</h1>
+        {!claro && (
+          <>
+            <Lanterns />
+            <div className="kanji" style={{ marginTop: 6 }}>今日は誰が食べる</div>
+          </>
+        )}
+        <h1 style={{ fontSize: claro ? 30 : 26, marginTop: 6 }}>¿Quién come hoy?</h1>
       </div>
 
       <div className="gate-grid">
@@ -64,7 +71,7 @@ export default function ProfileGate({ profiles, onPick, onCreated }) {
             <div className="avatar drop" style={{ borderColor: p.color, background: "var(--panel)" }}>
               <span style={{ filter: "saturate(1.1)" }}>{p.avatar_emoji}</span>
             </div>
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 15 }}>{p.name}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: claro ? 18 : 15, fontWeight: claro ? 600 : 400 }}>{p.name}</span>
           </button>
         ))}
 
@@ -89,20 +96,27 @@ export default function ProfileGate({ profiles, onPick, onCreated }) {
           </div>
           <div className="field">
             <label>Icono</label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 6 }}>
-              {EMOJIS.map((e) => (
-                <button key={e} className="chip center" data-on={emoji === e} onClick={() => setEmoji(e)} style={{ fontSize: 18, padding: 6 }}>{e}</button>
+            <AvatarPicker value={emoji} onChange={setEmoji} />
+          </div>
+          <div className="field">
+            <label>Color</label>
+            <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
+              {COLORS.map((c) => (
+                <button key={c} onClick={() => setColor(c)} aria-label={`Color ${c}`}
+                  style={{ width: 34, height: 34, background: c, borderRadius: 8, border: color === c ? "3px solid var(--washi)" : "3px solid var(--line)", cursor: "pointer" }} />
               ))}
             </div>
           </div>
           <div className="field">
-            <label>Color</label>
-            <div className="row">
-              {COLORS.map((c) => (
-                <button key={c} onClick={() => setColor(c)} aria-label={`Color ${c}`}
-                  style={{ width: 34, height: 34, background: c, border: color === c ? "3px solid var(--washi)" : "3px solid var(--line)", cursor: "pointer" }} />
+            <label>Aspecto de la app</label>
+            <div className="chips" style={{ flexWrap: "wrap" }}>
+              {THEMES.map((t) => (
+                <button key={t.key} className="chip" data-on={look === t.key} onClick={() => setLook(t.key)}>
+                  {t.label}
+                </button>
               ))}
             </div>
+            <span className="tiny dim">Se puede cambiar cuando quieras desde Perfil.</span>
           </div>
           <button className="btn btn-primary btn-block" disabled={!name.trim() || busy} onClick={create}>
             {busy ? "Creando…" : "Crear perfil"}

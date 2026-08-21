@@ -29,6 +29,31 @@ export function Sheet({ open, onClose, title, jp, children, footer }) {
   );
 }
 
+/* -------- pantalla completa (lista de la compra) -------- */
+export function FullScreen({ open, onClose, title, subtitle, children }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fs" role="dialog" aria-modal="true" aria-label={title}>
+      <header className="fs-head">
+        <button className="icon-btn" onClick={onClose} aria-label="Volver">←</button>
+        <div className="grow">
+          <h2 style={{ fontSize: 19 }}>{title}</h2>
+          {subtitle && <div className="tiny dim">{subtitle}</div>}
+        </div>
+      </header>
+      <div className="fs-body">{children}</div>
+    </div>
+  );
+}
+
 /* -------- barra segmentada -------- */
 export function PixelBar({ value, max, color = "var(--washi)", height }) {
   const ratio = max > 0 ? value / max : 0;
@@ -52,7 +77,7 @@ export function MacroBar({ label, value, target, unit = "g", color }) {
         </span>
       </div>
       <PixelBar value={value} max={target} color={color} />
-      <div className="num" style={{ fontSize: 9, color: "var(--muted-2)", marginTop: 3 }}>
+      <div className="num micro" style={{ marginTop: 3 }}>
         {left >= 0 ? `faltan ${left}${unit}` : `+${Math.abs(left)}${unit}`}
       </div>
     </div>
@@ -64,7 +89,7 @@ export function Insight({ tone, text }) {
   const c = tone === "good" ? "var(--matcha)" : tone === "warn" ? "var(--kaki)" : "var(--mizu)";
   return (
     <div className="row" style={{ alignItems: "flex-start", gap: 8, padding: "6px 0" }}>
-      <span style={{ color: c, fontFamily: "var(--font-num)", fontSize: 11, marginTop: 2 }}>
+      <span className="num" style={{ color: c, fontSize: 12, marginTop: 2 }}>
         {tone === "good" ? "◆" : "▲"}
       </span>
       <span className="tiny" style={{ color: "var(--muted)" }}>{text}</span>
@@ -110,7 +135,7 @@ export function PixelChart({ data, target, height = 96, colorFor }) {
       </div>
       <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
         {data.map((d, i) => (
-          <div key={i} className="grow num center" style={{ fontSize: 9, color: "var(--muted-2)" }}>{d.short}</div>
+          <div key={i} className="grow num center micro">{d.short}</div>
         ))}
       </div>
     </div>

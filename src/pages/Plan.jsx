@@ -1,15 +1,12 @@
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { Sheet } from "../components/ui";
-import { lookupBarcode } from "../lib/off";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Sheet, FullScreen } from "../components/ui";
+import { useTheme, Jp } from "../components/theme";
 import {
   getPlan, addPlanItem, deletePlanItem, copyWeek, addEntries,
-  listShopping, addShoppingItem, addShoppingItems, toggleShoppingItem, deleteShoppingItem,
-  clearDoneShopping, planIngredients,
+  listShopping, addShoppingItem, toggleShoppingItem, deleteShoppingItem,
+  clearDoneShopping,
 } from "../lib/store";
 import { isoDate, shiftDate, mondayOf, WEEKDAYS, WEEKDAYS_JP } from "../lib/nutrition";
-
-// el lector pesa; solo se descarga si lo abres
-const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
 
 const SLOTS = [
   { key: "comida", label: "Comida", jp: "昼" },
@@ -35,7 +32,7 @@ function PickDish({ open, onClose, recipes, profiles, slot, onPick }) {
   return (
     <Sheet open={open} onClose={onClose} title={slot ? `${slot.label} del ${slot.dayLabel}` : "Elegir plato"} jp="選択">
       <div className="stack">
-        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar receta…" autoFocus />
+        <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar receta…" />
 
         {profiles.length > 0 && (
           <div className="chips">
@@ -57,7 +54,7 @@ function PickDish({ open, onClose, recipes, profiles, slot, onPick }) {
                 ? <img src={r.photo_url} alt="" width={40} height={40} style={{ objectFit: "cover" }} loading="lazy" />
                 : <div style={{ width: 40, height: 40, background: "var(--night)", display: "grid", placeItems: "center" }}>🍚</div>}
               <div className="grow">
-                <div style={{ fontSize: 13 }}>{r.name}</div>
+                <div style={{ fontSize: 15 }}>{r.name}</div>
                 <div className="tiny num dim">
                   {Math.round(r.kcal)} kcal
                   {r.liked_by?.length ? " · " + profiles.filter((p) => r.liked_by.includes(p.id)).map((p) => p.avatar_emoji).join("") : ""}
@@ -81,17 +78,17 @@ function PickDish({ open, onClose, recipes, profiles, slot, onPick }) {
   );
 }
 
-/* --- casilla de verificación en píxeles --- */
+/* --- casilla de verificación --- */
 function PixelCheck({ on }) {
   return (
-    <svg viewBox="0 0 12 12" width="22" height="22" shapeRendering="crispEdges" aria-hidden="true">
-      <rect x="0" y="0" width="12" height="12" fill={on ? "#9cc97f" : "#1b1830"} />
-      <g fill="#453c6b">
+    <svg viewBox="0 0 12 12" width="26" height="26" shapeRendering="crispEdges" aria-hidden="true">
+      <rect x="0" y="0" width="12" height="12" fill={on ? "var(--matcha)" : "var(--night)"} />
+      <g fill="var(--line)">
         <rect x="0" y="0" width="12" height="1" /><rect x="0" y="11" width="12" height="1" />
         <rect x="0" y="0" width="1" height="12" /><rect x="11" y="0" width="1" height="12" />
       </g>
       {on && (
-        <g fill="#14121f">
+        <g fill="var(--night)">
           <rect x="2" y="6" width="2" height="2" />
           <rect x="4" y="8" width="2" height="2" />
           <rect x="6" y="6" width="2" height="2" />
@@ -102,16 +99,15 @@ function PixelCheck({ on }) {
   );
 }
 
-/* --- lista de la compra de la casa --- */
-function ShoppingList({ open, onClose, profileId, toast, from, to }) {
+/* ============================================================
+   Lista de la compra de la casa. Ocupa toda la pantalla y solo
+   hace una cosa: apuntar lo que falta y tacharlo al comprarlo.
+   El teclado no se abre solo: hay que tocar el campo.
+   ============================================================ */
+function ShoppingList({ open, onClose, profileId, toast }) {
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [importing, setImporting] = useState(null); // ingredientes propuestos
-  const [chosen, setChosen] = useState({});
-  const [scanning, setScanning] = useState(false);
-  const [scanKey, setScanKey] = useState(0);   // remontar el lector para el siguiente
-  const [scanMsg, setScanMsg] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,47 +117,7 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
   }, [toast]);
 
   useEffect(() => { if (open) load(); }, [open, load]);
-  useEffect(() => { if (!open) { setImporting(null); setChosen({}); setScanning(false); setScanMsg(""); } }, [open]);
-
-  async function openImport() {
-    try {
-      const rows = await planIngredients(from, to);
-      if (!rows.length) { toast("No hay recetas con ingredientes planificadas"); return; }
-      const already = new Set(items.filter((i) => !i.done).map((i) => i.text.toLowerCase()));
-      setChosen(Object.fromEntries(rows.map((r, i) => [i, !already.has(r.text.toLowerCase())])));
-      setImporting(rows);
-    } catch { toast("No se pudieron sacar los ingredientes"); }
-  }
-
-  async function confirmImport() {
-    const rows = importing.filter((_, i) => chosen[i]);
-    if (rows.length) {
-      await addShoppingItems(rows, profileId);
-      toast(`Añadidos ${rows.length} ingredientes`);
-    }
-    setImporting(null);
-    load();
-  }
-
-  // Escanear un producto y meterlo en la lista por su nombre
-  const onScan = useCallback(async (code) => {
-    if (!code) return;
-    setScanMsg(`Buscando ${code}…`);
-    try {
-      const found = await lookupBarcode(code);
-      const nombre = found ? found.name + (found.brand ? ` · ${found.brand}` : "") : "";
-      if (!nombre) {
-        setScanMsg(`El código ${code} no está en Open Food Facts. Apúntalo a mano.`);
-        return;
-      }
-      setItems((prev) => [...prev, { id: `tmp${Date.now()}`, text: nombre, done: false }]);
-      await addShoppingItem(nombre, profileId);
-      setScanMsg(`✓ ${nombre}`);
-      load();
-    } catch {
-      setScanMsg("Fallo al consultar el código. Prueba otra vez.");
-    }
-  }, [profileId, load]);
+  useEffect(() => { if (!open) setText(""); }, [open]);
 
   async function add() {
     const t = text.trim();
@@ -184,84 +140,26 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
   const pending = items.filter((i) => !i.done);
   const done = items.filter((i) => i.done);
 
-  if (importing) {
-    const n = Object.values(chosen).filter(Boolean).length;
-    return (
-      <Sheet open onClose={() => setImporting(null)} title="Ingredientes de la semana" jp="材料">
-        <div className="stack">
-          <p className="tiny dim" style={{ margin: 0 }}>
-            Sumados de todas las recetas que has planificado. Desmarca lo que ya tengas en casa.
-          </p>
-          <div className="row" style={{ gap: 8 }}>
-            <button className="btn btn-sm btn-ghost grow"
-              onClick={() => setChosen(Object.fromEntries(importing.map((_, i) => [i, true])))}>Marcar todo</button>
-            <button className="btn btn-sm btn-ghost grow"
-              onClick={() => setChosen({})}>Desmarcar todo</button>
-          </div>
-          <div style={{ maxHeight: "50vh", overflowY: "auto" }}>
-            {importing.map((r, i) => (
-              <div key={i} className="entry">
-                <button onClick={() => setChosen({ ...chosen, [i]: !chosen[i] })}
-                  style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }}
-                  aria-label={chosen[i] ? "Quitar" : "Añadir"}>
-                  <PixelCheck on={!!chosen[i]} />
-                </button>
-                <span className="grow" style={{ fontSize: 14, opacity: chosen[i] ? 1 : 0.45 }}>{r.text}</span>
-                <span className="num tiny dim">{r.qty}</span>
-              </div>
-            ))}
-          </div>
-          <div className="row">
-            <button className="btn btn-ghost" onClick={() => setImporting(null)}>Volver</button>
-            <button className="btn btn-primary grow" disabled={!n} onClick={confirmImport}>
-              Añadir {n} a la lista
-            </button>
-          </div>
-        </div>
-      </Sheet>
-    );
-  }
-
   return (
-    <Sheet open={open} onClose={onClose} title="Lista de la compra" jp="買物">
+    <FullScreen
+      open={open}
+      onClose={onClose}
+      title="Lista de la compra"
+      subtitle={pending.length ? `${pending.length} cosas por comprar` : "Todo comprado"}
+    >
       <div className="stack">
         <div className="row">
           <input
             className="input grow" value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
-            placeholder="Tomates, pan, huevos…" autoFocus
+            placeholder="Tomates, pan, huevos…"
+            enterKeyHint="done"
           />
           <button className="btn btn-primary" disabled={!text.trim()} onClick={add}>＋</button>
         </div>
         <p className="tiny dim" style={{ margin: 0 }}>
           Separa por comas para meter varias cosas de una vez. La lista es de toda la casa.
         </p>
-
-        <div className="row">
-          <button className="btn btn-sm btn-ghost grow" onClick={openImport}>
-            ⤓ Ingredientes de la semana
-          </button>
-          <button className="btn btn-sm btn-ghost grow"
-            onClick={() => { setScanning((v) => !v); setScanMsg(""); }}>
-            {scanning ? "✕ Cerrar cámara" : "码 Escanear producto"}
-          </button>
-        </div>
-
-        {scanning && (
-          <div className="px" style={{ padding: 10 }}>
-            <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
-              <BarcodeScanner key={scanKey} onDetected={onScan} />
-            </Suspense>
-            {scanMsg && (
-              <p className="tiny" style={{ color: scanMsg.startsWith("✓") ? "var(--matcha)" : "var(--kaki)", marginBottom: 6 }}>
-                {scanMsg}
-              </p>
-            )}
-            <button className="btn btn-sm btn-block" onClick={() => { setScanKey((k) => k + 1); setScanMsg(""); }}>
-              Escanear otro
-            </button>
-          </div>
-        )}
 
         {loading && !items.length && <div className="center tiny dim blink">cargando…</div>}
 
@@ -273,7 +171,7 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
                 <button onClick={() => toggle(it)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }} aria-label="Marcar">
                   <PixelCheck on={false} />
                 </button>
-                <span className="grow" style={{ fontSize: 15 }}>{it.text}</span>
+                <span className="grow" style={{ fontSize: 16 }}>{it.text}</span>
                 {it.qty && <span className="num tiny dim">{it.qty}</span>}
                 <button className="icon-btn tiny" aria-label="Quitar"
                   onClick={async () => { setItems((p) => p.filter((x) => x.id !== it.id)); await deleteShoppingItem(it.id); }}>✕</button>
@@ -292,11 +190,11 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
               </button>
             </div>
             {done.map((it) => (
-              <div key={it.id} className="entry" style={{ opacity: 0.5 }}>
+              <div key={it.id} className="entry" style={{ opacity: 0.55 }}>
                 <button onClick={() => toggle(it)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }} aria-label="Desmarcar">
                   <PixelCheck on={true} />
                 </button>
-                <span className="grow" style={{ fontSize: 15, textDecoration: "line-through" }}>{it.text}</span>
+                <span className="grow" style={{ fontSize: 16, textDecoration: "line-through" }}>{it.text}</span>
                 <button className="icon-btn tiny" aria-label="Quitar"
                   onClick={async () => { setItems((p) => p.filter((x) => x.id !== it.id)); await deleteShoppingItem(it.id); }}>✕</button>
               </div>
@@ -322,11 +220,12 @@ function ShoppingList({ open, onClose, profileId, toast, from, to }) {
           </button>
         )}
       </div>
-    </Sheet>
+    </FullScreen>
   );
 }
 
 export default function Plan({ profile, recipes, profiles, toast }) {
+  const { claro, jpLabel } = useTheme();
   const [monday, setMonday] = useState(mondayOf(isoDate()));
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -360,8 +259,8 @@ export default function Plan({ profile, recipes, profiles, toast }) {
       <div className="row-b">
         <button className="icon-btn num" onClick={() => setMonday(shiftDate(monday, -7))} aria-label="Semana anterior">◀</button>
         <div className="center">
-          <div className="kanji">献立表</div>
-          <h2 style={{ fontSize: 17 }}>{weekLabel()}</h2>
+          <Jp>献立表</Jp>
+          <h2 style={{ fontSize: 19 }}>{weekLabel()}</h2>
           {monday === mondayOf(isoDate()) && <div className="tiny" style={{ color: "var(--matcha)" }}>esta semana</div>}
         </div>
         <button className="icon-btn num" onClick={() => setMonday(shiftDate(monday, 7))} aria-label="Semana siguiente">▶</button>
@@ -388,11 +287,13 @@ export default function Plan({ profile, recipes, profiles, toast }) {
           <div key={date} className="px" style={{ padding: 12, borderColor: isToday ? "var(--sakura)" : undefined }}>
             <div className="row-b" style={{ marginBottom: 8 }}>
               <div className="row" style={{ gap: 8 }}>
-                <span className="kanji" style={{ fontSize: 15, color: isToday ? "var(--sakura)" : "var(--muted-2)" }}>
-                  {WEEKDAYS_JP[idx]}
-                </span>
+                {!claro && (
+                  <span className="kanji" style={{ fontSize: 15, color: isToday ? "var(--sakura)" : "var(--muted-2)" }}>
+                    {WEEKDAYS_JP[idx]}
+                  </span>
+                )}
                 <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 15 }}>{dayName}</div>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: claro ? 18 : 15, fontWeight: claro ? 700 : 400 }}>{dayName}</div>
                   <div className="tiny num" style={{ color: "var(--muted-2)" }}>
                     {new Date(date + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" })}
                   </div>
@@ -406,7 +307,7 @@ export default function Plan({ profile, recipes, profiles, toast }) {
               return (
                 <div key={slot.key} style={{ marginTop: 6 }}>
                   <div className="row-b">
-                    <span className="eyebrow">{slot.jp} {slot.label}</span>
+                    <span className="eyebrow">{jpLabel(slot.jp, slot.label)}</span>
                     <button className="btn btn-sm btn-ghost"
                       onClick={() => setPicking({ date, meal: slot.key, label: slot.label, dayLabel: dayName.toLowerCase(), key: slot.key })}>
                       ＋
@@ -423,7 +324,7 @@ export default function Plan({ profile, recipes, profiles, toast }) {
                           <img src={r.photo_url} alt="" width={34} height={34} style={{ objectFit: "cover" }} loading="lazy" />
                         )}
                         <div className="grow">
-                          <div style={{ fontSize: 14 }}>{r ? r.name : it.note}</div>
+                          <div style={{ fontSize: 15 }}>{r ? r.name : it.note}</div>
                           {r && (
                             <div className="tiny num" style={{ color: "var(--muted-2)" }}>
                               {Math.round(r.kcal)} kcal · P{Math.round(r.protein)} C{Math.round(r.carbs)} G{Math.round(r.fat)}
@@ -476,7 +377,7 @@ export default function Plan({ profile, recipes, profiles, toast }) {
 
       <ShoppingList
         open={shopping} onClose={() => setShopping(false)}
-        profileId={profile.id} toast={toast} from={monday} to={sunday}
+        profileId={profile.id} toast={toast}
       />
 
     </div>

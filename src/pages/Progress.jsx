@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { PixelBar, PixelChart, PixelLine, Insight, Sheet } from "../components/ui";
+import { useTheme, Jp } from "../components/theme";
 import { getSeries, listWeights, saveWeight, deleteWeight, getWaterSeries, getStepsSeries } from "../lib/store";
 import { targetsFor, periodStats, streakOf, isoDate, GOALS, stepsInfo } from "../lib/nutrition";
 
@@ -22,6 +23,7 @@ function Stat({ label, value, sub, color }) {
 }
 
 export default function Progress({ profile, toast }) {
+  const { jp, jpLabel } = useTheme();
   const [range, setRange] = useState(7);
   const [days, setDays] = useState([]);
   const [weights, setWeights] = useState([]);
@@ -117,14 +119,14 @@ export default function Progress({ profile, toast }) {
   return (
     <div className="wrap stack" style={{ paddingTop: 12 }}>
       <div>
-        <div className="kanji">記録</div>
-        <h2 style={{ fontSize: 20 }}>Tu registro</h2>
+        <Jp>記録</Jp>
+        <h2 style={{ fontSize: 22 }}>Tu registro</h2>
       </div>
 
       <div className="chips">
         {RANGES.map((r) => (
           <button key={r.key} className="chip" data-on={range === r.key} onClick={() => setRange(r.key)}>
-            {r.jp} {r.label}
+            {jpLabel(r.jp, r.label)}
           </button>
         ))}
       </div>
@@ -145,7 +147,7 @@ export default function Progress({ profile, toast }) {
       {stats ? (
         <>
           <div className="row" style={{ flexWrap: "wrap", gap: 10 }}>
-            <Stat label="Media kcal" value={stats.kcal} sub={`${stats.days} días con registro`} />
+            <Stat label="Media kcal" value={stats.kcal} sub={`media de los ${stats.days} días que apuntaste`} />
             <Stat label="Constancia" value={`${stats.adherence}%`} sub="días cerca del objetivo"
               color={stats.adherence >= 70 ? "var(--matcha)" : "var(--kaki)"} />
             <Stat label="Racha" value={`${streak} d`} sub="días seguidos apuntando" color="var(--lantern)" />
@@ -154,7 +156,10 @@ export default function Progress({ profile, toast }) {
           </div>
 
           <div className="px" style={{ padding: 14 }}>
-            <div className="eyebrow" style={{ marginBottom: 10 }}>Medias de macros</div>
+            <div className="row-b" style={{ marginBottom: 10 }}>
+              <span className="eyebrow">Medias de macros</span>
+              <span className="tiny" style={{ color: "var(--muted-2)" }}>{stats.days} días apuntados</span>
+            </div>
             {[
               ["Proteína", stats.protein, targets.protein, "var(--sakura)"],
               ["Carbos", stats.carbs, targets.carbs, "var(--lantern)"],
@@ -186,10 +191,15 @@ export default function Progress({ profile, toast }) {
       <div className="px" style={{ padding: 14 }}>
         <div className="row-b" style={{ marginBottom: 10 }}>
           <div>
-            <span className="eyebrow">Agua 水</span>
-            <div className="num" style={{ fontSize: 18, color: "var(--mizu)" }}>
+            <span className="eyebrow">Agua {jp("水")}</span>
+            <div className="num" style={{ fontSize: 20, color: "var(--mizu)" }}>
               {(waterAvg / 1000).toFixed(2).replace(".", ",")} L
               <span className="tiny dim"> de media</span>
+            </div>
+            <div className="tiny" style={{ color: "var(--muted-2)" }}>
+              {waterLogged.length
+                ? `media de los ${waterLogged.length} días que apuntaste`
+                : "sin días apuntados"}
             </div>
           </div>
           <span className="tiny num dim">objetivo {(waterGoal / 1000).toString().replace(".", ",")} L</span>
@@ -209,10 +219,15 @@ export default function Progress({ profile, toast }) {
       <div className="px" style={{ padding: 14 }}>
         <div className="row-b" style={{ marginBottom: 10 }}>
           <div>
-            <span className="eyebrow">Pasos 歩数</span>
-            <div className="num" style={{ fontSize: 18, color: "var(--matcha)" }}>
+            <span className="eyebrow">Pasos {jp("歩数")}</span>
+            <div className="num" style={{ fontSize: 20, color: "var(--matcha)" }}>
               {stepsAvg.toLocaleString("es-ES")}
               <span className="tiny dim"> al día</span>
+            </div>
+            <div className="tiny" style={{ color: "var(--muted-2)" }}>
+              {stepsLogged.length
+                ? `media de los ${stepsLogged.length} días que apuntaste`
+                : "sin días apuntados"}
             </div>
           </div>
           <span className="tiny num dim">objetivo {stepsGoal.toLocaleString("es-ES")}</span>
@@ -239,7 +254,7 @@ export default function Progress({ profile, toast }) {
       <div className="px" style={{ padding: 14 }}>
         <div className="row-b">
           <div>
-            <div className="eyebrow">Peso 体重</div>
+            <div className="eyebrow">Peso {jp("体重")}</div>
             <div className="num" style={{ fontSize: 21 }}>
               {wLast ? `${wLast} kg` : "—"}
               {wDelta != null && wDelta !== 0 && (

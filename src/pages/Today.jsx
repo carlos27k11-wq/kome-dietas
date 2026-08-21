@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { WindowScene, RiceBowl, dayPhase } from "../components/PixelArt";
 import { Sheet, PixelBar, MacroBar, Insight } from "../components/ui";
+import { useTheme } from "../components/theme";
 import AddSheet from "../components/AddSheet";
 import {
   MEALS, targetsFor, mealTargets, sumEntries, dayInsights,
@@ -8,16 +9,16 @@ import {
 } from "../lib/nutrition";
 import {
   getDay, addEntries, updateEntry, deleteEntry, copyDay,
-  getWater, addWater, resetWater, getSteps, setSteps,
+  getWater, addWater, resetWater, setWaterTotal, getSteps, setSteps,
 } from "../lib/store";
 
-/* --- vaso de agua en píxeles --- */
+/* --- vaso de agua --- */
 function Cup({ filled }) {
   return (
-    <svg viewBox="0 0 10 12" width="20" height="24" shapeRendering="crispEdges" aria-hidden="true">
-      <rect x="1" y="1" width="8" height="10" fill={filled ? "#79b0dc" : "#241f3b"} />
-      <rect x="1" y="1" width="8" height="1" fill={filled ? "#a8d0ec" : "#362f57"} />
-      <g fill="#453c6b">
+    <svg viewBox="0 0 10 12" width="22" height="26" shapeRendering="crispEdges" aria-hidden="true">
+      <rect x="1" y="1" width="8" height="10" fill={filled ? "var(--mizu)" : "var(--panel-2)"} />
+      <rect x="1" y="1" width="8" height="1" fill={filled ? "var(--mizu)" : "var(--line-soft)"} opacity={filled ? 0.65 : 1} />
+      <g fill="var(--line)">
         <rect x="0" y="0" width="10" height="1" />
         <rect x="0" y="0" width="1" height="12" />
         <rect x="9" y="0" width="1" height="12" />
@@ -27,11 +28,11 @@ function Cup({ filled }) {
   );
 }
 
-/* --- huella en píxeles --- */
+/* --- huella --- */
 function Footprint({ on }) {
-  const c = on ? "#9cc97f" : "#3a3159";
+  const c = on ? "var(--matcha)" : "var(--line-soft)";
   return (
-    <svg viewBox="0 0 7 10" width="14" height="20" shapeRendering="crispEdges" aria-hidden="true">
+    <svg viewBox="0 0 7 10" width="15" height="21" shapeRendering="crispEdges" aria-hidden="true">
       <rect x="1" y="0" width="1" height="1" fill={c} />
       <rect x="3" y="0" width="1" height="1" fill={c} />
       <rect x="5" y="1" width="1" height="1" fill={c} />
@@ -39,6 +40,35 @@ function Footprint({ on }) {
       <rect x="2" y="5" width="3" height="2" fill={c} />
       <rect x="1" y="7" width="4" height="3" fill={c} />
     </svg>
+  );
+}
+
+/* ============================================================
+   Campo para meter el total a mano. Se despliega solo cuando se
+   pulsa, así el teclado no salta sin querer.
+   ============================================================ */
+function TotalEditor({ label, unit, value, step = 1, onSave, onCancel }) {
+  const [draft, setDraft] = useState(String(value ?? ""));
+  const n = Number(String(draft).replace(/\./g, "").replace(",", "."));
+  const ok = isFinite(n) && n >= 0;
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="field">
+        <label>{label}</label>
+        <div className="row">
+          <input
+            className="input num grow" type="number" inputMode="numeric" min="0" step={step}
+            value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus
+          />
+          <span className="dim num">{unit}</span>
+        </div>
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button className="btn btn-ghost grow btn-sm" onClick={onCancel}>Cancelar</button>
+        <button className="btn btn-primary grow btn-sm" disabled={!ok} onClick={() => onSave(n)}>Guardar total</button>
+      </div>
+    </div>
   );
 }
 
@@ -98,6 +128,7 @@ function EntryEditor({ entry, onClose, onSave, onDelete }) {
 }
 
 export default function Today({ profile, recipes, toast }) {
+  const { claro, jp } = useTheme();
   const [date, setDate] = useState(isoDate());
   const [entries, setEntries] = useState([]);
   const [water, setWater] = useState(0);
@@ -106,6 +137,8 @@ export default function Today({ profile, recipes, toast }) {
   const [addFor, setAddFor] = useState(null);
   const [editing, setEditing] = useState(null);
   const [showMicros, setShowMicros] = useState(false);
+  const [editWater, setEditWater] = useState(false);
+  const [editSteps, setEditSteps] = useState(false);
 
   const targets = useMemo(() => targetsFor(profile), [profile]);
   const totals = useMemo(() => sumEntries(entries), [entries]);
@@ -124,6 +157,7 @@ export default function Today({ profile, recipes, toast }) {
   }, [profile.id, date, toast]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setEditWater(false); setEditSteps(false); }, [date]);
 
   const byMeal = useMemo(() => {
     const m = {};
@@ -151,17 +185,17 @@ export default function Today({ profile, recipes, toast }) {
       <div className="row-b">
         <button className="icon-btn num" onClick={() => setDate(shiftDate(date, -1))} aria-label="Día anterior">◀</button>
         <div className="center">
-          <div className="kanji">{date}</div>
-          <h2 style={{ fontSize: 18, textTransform: "capitalize" }}>{prettyDate(date)}</h2>
+          <div className="eyebrow num">{date}</div>
+          <h2 style={{ fontSize: claro ? 22 : 18, textTransform: "capitalize" }}>{prettyDate(date)}</h2>
         </div>
         <button className="icon-btn num" onClick={() => setDate(shiftDate(date, 1))}
           disabled={date >= isoDate()} style={{ opacity: date >= isoDate() ? 0.25 : 1 }} aria-label="Día siguiente">▶</button>
       </div>
 
-      {/* --- ventana + resumen --- */}
+      {/* --- resumen del día --- */}
       <div className="px drop" style={{ padding: 0, overflow: "hidden" }}>
-        <WindowScene phase={dayPhase()} showCat={proteinDone} kcalRatio={ratio} />
-        <div style={{ padding: 14, borderTop: "var(--px) solid var(--line)" }}>
+        {!claro && <WindowScene phase={dayPhase()} showCat={proteinDone} kcalRatio={ratio} />}
+        <div style={{ padding: 14, borderTop: claro ? "none" : "var(--px) solid var(--line)" }}>
           <div className="row-b" style={{ alignItems: "flex-end" }}>
             <div>
               <div className="eyebrow">{left >= 0 ? "Te quedan" : "Te has pasado"}</div>
@@ -170,11 +204,11 @@ export default function Today({ profile, recipes, toast }) {
               </div>
               <div className="tiny dim num">de {targets.kcal} kcal · llevas {Math.round(totals.kcal)}</div>
             </div>
-            <RiceBowl ratio={ratio} size={4} />
+            {!claro && <RiceBowl ratio={ratio} size={4} />}
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <PixelBar value={totals.kcal} max={targets.kcal} color="var(--washi)" height={18} />
+            <PixelBar value={totals.kcal} max={targets.kcal} color="var(--washi)" height={claro ? 20 : 18} />
           </div>
 
           <div className="row" style={{ gap: 12, marginTop: 14, alignItems: "flex-start" }}>
@@ -205,8 +239,8 @@ export default function Today({ profile, recipes, toast }) {
       <div className="px" style={{ padding: 12 }}>
         <div className="row-b">
           <div>
-            <div className="eyebrow">Agua 水</div>
-            <div className="num" style={{ fontSize: 17 }}>
+            <div className="eyebrow">Agua {jp("水")}</div>
+            <div className="num" style={{ fontSize: claro ? 22 : 17 }}>
               {(water / 1000).toFixed(2).replace(".", ",")} L <span className="dim tiny">/ {(waterGoal / 1000).toString().replace(".", ",")} L</span>
             </div>
           </div>
@@ -220,14 +254,29 @@ export default function Today({ profile, recipes, toast }) {
             <Cup key={i} filled={i < Math.floor(water / 250)} />
           ))}
         </div>
+
+        {editWater ? (
+          <TotalEditor
+            label="Total de agua del día" unit="ml" value={water} step={50}
+            onCancel={() => setEditWater(false)}
+            onSave={async (ml) => {
+              const v = await setWaterTotal(profile.id, date, ml);
+              setWater(v); setEditWater(false); toast("Agua actualizada");
+            }}
+          />
+        ) : (
+          <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setEditWater(true)}>
+            ✎ Poner el total a mano
+          </button>
+        )}
       </div>
 
       {/* --- pasos --- */}
       <div className="px" style={{ padding: 12 }}>
         <div className="row-b">
           <div>
-            <div className="eyebrow">Pasos 歩数</div>
-            <div className="num" style={{ fontSize: 17 }}>
+            <div className="eyebrow">Pasos {jp("歩数")}</div>
+            <div className="num" style={{ fontSize: claro ? 22 : 17 }}>
               {steps.toLocaleString("es-ES")} <span className="dim tiny">/ {stepsGoal.toLocaleString("es-ES")}</span>
             </div>
           </div>
@@ -249,20 +298,26 @@ export default function Today({ profile, recipes, toast }) {
           ))}
         </div>
 
-        <div className="row-b" style={{ marginTop: 8 }}>
-          <span className="tiny dim num">
-            ≈ {walk.km.toString().replace(".", ",")} km{walk.kcal ? ` · ${walk.kcal} kcal gastadas` : ""}
-          </span>
-          <button className="icon-btn tiny" aria-label="Poner pasos a mano"
-            onClick={async () => {
-              const v = prompt("Pasos de hoy", String(steps));
-              if (v === null) return;
-              const n = Number(v.replace(/\./g, "").replace(",", "."));
-              if (!isFinite(n)) return;
-              setStepsState(await setSteps(profile.id, date, n));
-            }}>✎</button>
+        <div className="tiny dim num" style={{ marginTop: 8 }}>
+          ≈ {walk.km.toString().replace(".", ",")} km{walk.kcal ? ` · ${walk.kcal} kcal gastadas` : ""}
         </div>
-        <p className="tiny" style={{ color: "var(--muted-2)", margin: "6px 0 0" }}>
+
+        {editSteps ? (
+          <TotalEditor
+            label="Total de pasos del día" unit="pasos" value={steps} step={100}
+            onCancel={() => setEditSteps(false)}
+            onSave={async (n) => {
+              const v = await setSteps(profile.id, date, n);
+              setStepsState(v); setEditSteps(false); toast("Pasos actualizados");
+            }}
+          />
+        ) : (
+          <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setEditSteps(true)}>
+            ✎ Poner el total a mano
+          </button>
+        )}
+
+        <p className="tiny" style={{ color: "var(--muted-2)", margin: "8px 0 0" }}>
           Las kcal andando no se suman a lo que puedes comer: tu factor de actividad ya las incluye.
         </p>
       </div>
@@ -284,9 +339,9 @@ export default function Today({ profile, recipes, toast }) {
           <div key={m.key} className="px meal">
             <div className="row-b">
               <div className="row" style={{ gap: 8 }}>
-                <span style={{ fontSize: 17 }}>{m.emoji}</span>
+                <span style={{ fontSize: 19 }}>{m.emoji}</span>
                 <div>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 15 }}>{m.label}</div>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: claro ? 18 : 15, fontWeight: claro ? 700 : 400 }}>{m.label}</div>
                   <div className="tiny num" style={{ color: "var(--muted-2)" }}>
                     {Math.round(kcal)} kcal{target > 0 ? ` · objetivo ${target}` : ""}
                   </div>
@@ -300,13 +355,13 @@ export default function Today({ profile, recipes, toast }) {
               <div key={e.id} className="entry">
                 <button className="grow" onClick={() => setEditing(e)}
                   style={{ background: "none", border: "none", textAlign: "left", padding: 0, cursor: "pointer", color: "inherit" }}>
-                  <div style={{ fontSize: 14 }}>{e.name}</div>
+                  <div style={{ fontSize: 15 }}>{e.name}</div>
                   <div className="tiny num" style={{ color: "var(--muted-2)" }}>
                     {e.source_type === "recipe" ? `${e.servings} rac.` : e.grams ? `${Math.round(e.grams)} g` : "a ojo"}
                     {" · "}P{Math.round(e.protein)} C{Math.round(e.carbs)} G{Math.round(e.fat)}
                   </div>
                 </button>
-                <span className="num" style={{ fontSize: 13 }}>{Math.round(e.kcal)}</span>
+                <span className="num" style={{ fontSize: 14 }}>{Math.round(e.kcal)}</span>
               </div>
             ))}
 

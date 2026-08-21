@@ -9,11 +9,19 @@ const html = `<!doctype html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#14121F">
+<script>
+  /* tema guardado, antes de pintar nada, para que no parpadee */
+  try {
+    document.documentElement.dataset.theme =
+      localStorage.getItem("kome:theme") === "claro" ? "claro" : "kome";
+  } catch (e) {}
+</script>
 <title>米 kome — dietas en familia</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Silkscreen:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;500;600;700;800&family=Silkscreen:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2314121F'/%3E%3Crect x='3' y='7' width='10' height='5' fill='%23EDE4D3'/%3E%3Crect x='2' y='7' width='12' height='1' fill='%23F09BB6'/%3E%3Crect x='4' y='4' width='2' height='2' fill='%239CC97F'/%3E%3Crect x='7' y='3' width='2' height='2' fill='%239CC97F'/%3E%3C/svg%3E">
 
 <!-- ==========================================================

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { Sheet } from "./ui";
+import { useTheme } from "./theme";
 
 // el lector de códigos pesa; se carga solo cuando hace falta
 const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
@@ -205,6 +206,7 @@ function QuickAdd({ meal, onConfirm }) {
 
 /* ============================================================ */
 export default function AddSheet({ open, onClose, meal = "comida", recipes = [], profileId, onAdded }) {
+  const { jpLabel } = useTheme();
   const [tab, setTab] = useState("buscar");
   const [q, setQ] = useState("");
   const [mine, setMine] = useState([]);
@@ -300,7 +302,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
           <div className="chips">
             {TABS.map((t) => (
               <button key={t.key} className="chip" data-on={tab === t.key} onClick={() => setTab(t.key)}>
-                {t.jp} {t.label}
+                {jpLabel(t.jp, t.label)}
               </button>
             ))}
           </div>

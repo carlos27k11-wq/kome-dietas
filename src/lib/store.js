@@ -37,6 +37,15 @@ export async function searchFoods(q, limit = 30) {
   return data;
 }
 
+/** Despensa de la casa, alfabética: la pestaña de Ingredientes */
+export async function listFoods(q, limit = 200) {
+  let qb = supabase.from("foods").select("*").limit(limit);
+  if (q && q.trim()) qb = qb.ilike("name", `%${q.trim()}%`);
+  const { data, error } = await qb.order("name");
+  if (error) throw error;
+  return data;
+}
+
 export async function recentFoods(limit = 12) {
   const { data, error } = await supabase
     .from("foods").select("*").order("times_used", { ascending: false }).limit(limit);
@@ -200,6 +209,17 @@ export async function getWater(profileId, date) {
 export async function addWater(profileId, date, ml) {
   const { error } = await supabase.from("water_logs").insert({ profile_id: profileId, date, ml });
   if (error) throw error;
+}
+
+/** Pone el total del día de una vez (sustituye lo apuntado) */
+export async function setWaterTotal(profileId, date, ml) {
+  const value = Math.max(0, Math.round(ml));
+  await supabase.from("water_logs").delete().eq("profile_id", profileId).eq("date", date);
+  if (value > 0) {
+    const { error } = await supabase.from("water_logs").insert({ profile_id: profileId, date, ml: value });
+    if (error) throw error;
+  }
+  return value;
 }
 
 export async function resetWater(profileId, date) {

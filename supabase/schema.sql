@@ -215,3 +215,16 @@ create table if not exists public.shopping_items (
 );
 alter table public.shopping_items enable row level security;
 create policy "acceso_familia" on public.shopping_items for all to anon, authenticated using (true) with check (true);
+
+-- ============================================================
+-- Tema por persona: cada perfil elige cómo se ve la app
+--   'kome'  = el original (oscuro, píxeles, japonés)
+--   'claro' = alto contraste, letra grande, sin japonés
+-- ============================================================
+
+alter table public.profiles
+  add column if not exists theme text not null default 'kome';
+alter table public.profiles
+  drop constraint if exists profiles_theme_check;
+alter table public.profiles
+  add constraint profiles_theme_check check (theme in ('kome','claro'));

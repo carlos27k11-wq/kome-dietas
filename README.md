@@ -7,34 +7,58 @@ Un perfil por persona, sin contraseñas, estilo Netflix.
 
 **Hoy** — Diario del día por comidas (desayuno, comida, merienda, cena, extras), con objetivo
 de kcal repartido por comida. Barras de proteína, carbos y grasa, más el detalle de fibra,
-azúcares, grasa saturada y sodio. Registro de agua y de pasos (de mil en mil). Lectura automática del día con avisos
+azúcares, grasa saturada y sodio. Registro de agua (vasos de 250 ml) y de pasos (de mil en mil), o metiendo el total del día a
+mano si lo llevas apuntado en otro sitio. Lectura automática del día con avisos
 nutricionales. Copiar el día anterior de un toque.
 
-**Recetas** — Biblioteca de platos con foto grande; al pulsar se amplía. Cada receta se monta
-con ingredientes reales y la app calcula los macros por ración. Los ingredientes se añaden de
-tres maneras: buscándolos (despensa de casa + Open Food Facts), **escaneando el código de
-barras** con la cámara, o **creándolos a mano** con sus valores por 100 g cuando no están en
-ninguna base. Lo que creas queda guardado para toda la casa. Se marca a quién de la casa le gusta cada plato y se puede filtrar por persona o ver
-solo lo que gusta a todos. Se añaden al diario en un toque.
+**Recetario** — Dos subpestañas.
+
+*Recetas*: biblioteca de platos con foto grande; al pulsar se amplía. Cada receta se monta con
+ingredientes reales y la app calcula los macros por ración. Para meter un ingrediente basta con
+buscarlo por el nombre (despensa de casa + Open Food Facts) o pulsar la cámara y **escanear su
+código de barras**. Se marca a quién de la casa le gusta cada plato y se puede filtrar por
+persona o ver solo lo que gusta a todos. Se añaden al diario en un toque.
+
+*Ingredientes*: la despensa de casa. Se van metiendo **escaneando el código de barras** de los
+productos: si están en Open Food Facts se guardan solos con todos sus valores y, si no, se
+rellena la etiqueta a mano. Desde aquí se corrigen y se borran. Lo que hay en esta pestaña es
+lo que luego aparece al montar una receta.
 
 **Plan** — Calendario semanal con comida y cena de cada día. Se eligen recetas (filtrando por
 quién se las come) o se apunta texto libre. Copia la semana anterior de un toque. Incluye la
-lista de la compra de la casa: apuntas lo que falte, se tacha al comprarlo y la ve toda la
-familia. También puedes traer los ingredientes de las recetas de la semana (sumados y con
-cantidades) o los de una receta suelta desde su ficha, y **escanear productos con la cámara**
-para meterlos en la lista mientras vacías la despensa.
+lista de la compra de la casa: se abre a pantalla completa, apuntas lo que falte, se tacha al
+comprarlo y la ve toda la familia. Desde la ficha de una receta puedes mandar sus ingredientes
+a la lista.
 
 **Registro** — Gráfico de kcal por día frente al objetivo (7 / 30 / 90 días), medias de macros,
 constancia, racha, balance energético acumulado y su equivalente en kg. Gráficos de agua y de
-pasos diarios con sus medias. Seguimiento de peso con línea de tendencia.
+pasos diarios con sus medias. Seguimiento de peso con línea de tendencia. Los días en los que
+no apuntas nada no entran en ninguna media: cada media cuenta solo los días con registro y
+dice cuántos son.
 
-**Perfil** — Sexo, edad, altura, peso, actividad y objetivo. Calcula el metabolismo basal
+**Perfil** — Icono (más de cien, agrupados por temas), color, **tema de la app**, sexo,
+edad, altura, peso, actividad y objetivo. Calcula el metabolismo basal
 (Mifflin-St Jeor), el gasto total y reparte los macros: proteína y grasa por kilo de peso,
 carbohidrato con la energía restante. Con topes de seguridad: nunca por debajo del basal ni de
 1.200 / 1.500 kcal, y grasa mínima de 0,6 g/kg.
 
 Alimentos: base local compartida + Open Food Facts (búsqueda por texto y por código de barras
 con la cámara).
+
+## Temas
+
+Cada perfil elige cómo se ve la app y queda guardado en su ficha: al entrar con ese perfil se
+pone solo, sin tocar nada.
+
+- **Kome** — el original: oscuro, con píxeles, la ventana que cambia con la hora y los
+  detalles en japonés.
+- **Claro y grande** — pensado para que se lea sin esfuerzo. Fondo claro, texto casi negro,
+  tipografía más grande (Inter), botones y campos más altos, colores oscurecidos para que
+  contrasten, y ni una palabra en japonés. Sigue siendo un diseño con tarjetas y aire, solo
+  que minimalista.
+
+Se elige en **Perfil → Aspecto de la app** (o al crear el perfil). El cambio se ve al momento
+y se fija al guardar. Vive en la columna `theme` de la tabla `profiles`.
 
 ## Poner en marcha
 
@@ -62,8 +86,9 @@ Cada push a `main` vuelve a desplegar solo.
 Ya está creada en el proyecto Supabase `dietas-familia`. El esquema completo está en
 `supabase/schema.sql` por si necesitas rehacerlo.
 
-Tablas: `profiles`, `foods`, `recipes`, `recipe_ingredients`, `diary_entries`, `water_logs`,
-`weight_logs`, y la vista `daily_totals`. Bucket `recipe-photos` para las fotos.
+Tablas: `profiles` (con `theme`), `foods`, `recipes`, `recipe_ingredients`, `diary_entries`,
+`water_logs`, `weight_logs`, `step_logs`, `meal_plan`, `shopping_items`, y las vistas
+`daily_totals`, `daily_water` y `daily_steps`. Bucket `recipe-photos` para las fotos.
 
 **Sobre la seguridad:** al no haber login, la clave pública da acceso de lectura y escritura a
 los datos de la familia. Es lo que pediste (elegir perfil y entrar), y es razonable para uso

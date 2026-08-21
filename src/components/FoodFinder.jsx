@@ -6,6 +6,8 @@ import { FoodRow, stripUi } from "./AddSheet";
 
 // el lector pesa 300 kB; solo se carga si abres su pestaña
 const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
+// el lector de etiquetas se baja tesseract de internet; solo cuando se abre
+const LabelScanner = lazy(() => import("./LabelScanner"));
 
 const TABS = [
   { key: "buscar", label: "Buscar", jp: "探" },
@@ -17,23 +19,105 @@ const TABS = [
    Alta manual: para lo que no está ni en la despensa ni en
    Open Food Facts. Se guarda en `foods`, así que queda para
    siempre y lo encuentran todos en la casa.
+
+   Dos atajos para no teclear tanto:
+   · escanear el código de barras — así el alimento queda
+     guardado con su código y la próxima vez se encuentra
+     apuntando con la cámara, sin buscarlo por el nombre;
+   · leer la etiqueta con la cámara — saca los macros de la
+     tabla de información nutricional. Todo queda editable,
+     que el lector se equivoca.
    ============================================================ */
+const DEL_LECTOR = [
+  "kcal_100", "protein_100", "carbs_100", "fat_100",
+  "fiber_100", "sugars_100", "sat_fat_100", "sodium_100", "default_serving_g",
+];
+
 export function ManualFood({ barcode = "", onSaved, onCancel }) {
   const [f, setF] = useState({
     name: "", brand: "", kcal_100: "", protein_100: "", carbs_100: "", fat_100: "",
     fiber_100: "", sugars_100: "", sat_fat_100: "", sodium_100: "", default_serving_g: 100,
   });
+  const [code, setCode] = useState(barcode);
   const [detalle, setDetalle] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [cam, setCam] = useState(false);       // cámara del código de barras
+  const [scanKey, setScanKey] = useState(0);
+  const [lector, setLector] = useState(false); // lector de la etiqueta
+  const [leidos, setLeidos] = useState([]);    // lo que ha puesto la cámara
 
-  const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+  useEffect(() => { setCode(barcode); }, [barcode]);
+
+  const set = (k) => (e) => {
+    setF((p) => ({ ...p, [k]: e.target.value }));
+    setLeidos((l) => l.filter((x) => x !== k));   // lo tocas tú, deja de estar en duda
+  };
   const n = (v) => (v === "" || v == null ? null : Number(v));
 
   const kcalAuto = Math.round(
     (Number(f.protein_100) || 0) * 4 + (Number(f.carbs_100) || 0) * 4 + (Number(f.fat_100) || 0) * 9
   );
   const ok = f.name.trim() && (Number(f.kcal_100) > 0 || kcalAuto > 0);
+
+  /* --- código de barras: lo guardamos con el alimento --- */
+  const onCode = useCallback(async (c) => {
+    if (!c) return;
+    setCode(c);
+    setCam(false);
+    setAviso(`Código ${c} guardado.`);
+    try {
+      const yaEsta = await findFoodByBarcode(c);
+      if (yaEsta) {
+        setAviso(`Ojo: "${yaEsta.name}" ya está en la despensa con este código.`);
+        return;
+      }
+      const found = await lookupBarcode(c);
+      if (!found) return;
+      // si Open Food Facts lo conoce, rellenamos lo que esté en blanco
+      setF((p) => {
+        const nuevo = { ...p };
+        if (!p.name.trim()) nuevo.name = found.name || "";
+        if (!p.brand.trim() && found.brand) nuevo.brand = found.brand;
+        for (const k of DEL_LECTOR) {
+          if ((nuevo[k] === "" || nuevo[k] == null) && found[k] != null) nuevo[k] = String(found[k]);
+        }
+        return nuevo;
+      });
+      setAviso(`Encontrado en Open Food Facts: ${found.name}. Repasa los valores.`);
+    } catch {
+      /* sin conexión: nos quedamos con el código y ya está */
+    }
+  }, []);
+
+  /* --- lo que saca el lector de la etiqueta --- */
+  const aplicarLectura = useCallback((vals) => {
+    const puestos = DEL_LECTOR.filter((k) => vals[k] != null);
+    setF((p) => {
+      const nuevo = { ...p };
+      for (const k of puestos) nuevo[k] = String(vals[k]);
+      return nuevo;
+    });
+    setLeidos(puestos);
+    if (puestos.some((k) => ["fiber_100", "sugars_100", "sat_fat_100", "sodium_100"].includes(k))) {
+      setDetalle(true);
+    }
+    setLector(false);
+    setAviso("Valores leídos de la etiqueta. Repásalos antes de guardar.");
+  }, []);
+
+  const num = (k, label, extra = null) => (
+    <div className="field grow">
+      <label>{label} {extra}</label>
+      <input
+        className={"input num" + (leidos.includes(k) ? " ocr" : "")}
+        inputMode="decimal"
+        value={f[k] ?? ""}
+        onChange={set(k)}
+      />
+    </div>
+  );
 
   async function guardar() {
     setBusy(true);
@@ -42,7 +126,7 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
       const saved = await saveFood({
         name: f.name.trim(),
         brand: f.brand.trim() || null,
-        barcode: barcode || null,
+        barcode: code || null,
         source: "manual",
         kcal_100: Number(f.kcal_100) || kcalAuto,
         protein_100: Number(f.protein_100) || 0,
@@ -69,12 +153,51 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
         para toda la casa.
       </p>
 
-      {barcode && (
-        <div className="px" style={{ padding: 8 }}>
-          <span className="eyebrow">Código escaneado</span>
-          <div className="num tiny">{barcode}</div>
+      {/* --- código de barras --- */}
+      <div className="px" style={{ padding: 10 }}>
+        <div className="row-b">
+          <div className="grow">
+            <span className="eyebrow">Código de barras</span>
+            <div className="num tiny">
+              {code || <span className="dim">sin código — se puede escanear</span>}
+            </div>
+          </div>
+          <button
+            className={"btn btn-sm" + (code ? "" : " btn-primary")}
+            onClick={() => { setCam((v) => !v); setScanKey((k) => k + 1); }}
+          >
+            {cam ? "✕" : code ? "📷 Otro" : "📷 Escanear"}
+          </button>
         </div>
+        {code && !cam && (
+          <p className="tiny dim" style={{ margin: "6px 0 0" }}>
+            Con el código guardado, la próxima vez lo encuentras apuntando con la cámara.
+          </p>
+        )}
+        {cam && (
+          <div style={{ marginTop: 8 }}>
+            <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
+              <BarcodeScanner key={scanKey} onDetected={onCode} />
+            </Suspense>
+            <button className="btn btn-sm btn-block" onClick={() => setScanKey((k) => k + 1)}>
+              Volver a escanear
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* --- lector de la etiqueta --- */}
+      {lector ? (
+        <Suspense fallback={<div className="empty tiny blink">abriendo el lector…</div>}>
+          <LabelScanner onValues={aplicarLectura} onClose={() => setLector(false)} />
+        </Suspense>
+      ) : (
+        <button className="btn btn-block" onClick={() => setLector(true)}>
+          📸 Leer la tabla nutricional
+        </button>
       )}
+
+      {aviso && <p className="tiny" style={{ color: "var(--kaki)", margin: 0 }}>{aviso}</p>}
 
       <div className="field">
         <label>Nombre</label>
@@ -86,15 +209,12 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
       </div>
 
       <div className="row">
-        <div className="field grow"><label>Proteína</label><input className="input num" inputMode="decimal" value={f.protein_100} onChange={set("protein_100")} /></div>
-        <div className="field grow"><label>Carbos</label><input className="input num" inputMode="decimal" value={f.carbs_100} onChange={set("carbs_100")} /></div>
-        <div className="field grow"><label>Grasa</label><input className="input num" inputMode="decimal" value={f.fat_100} onChange={set("fat_100")} /></div>
+        {num("protein_100", "Proteína")}
+        {num("carbs_100", "Carbos")}
+        {num("fat_100", "Grasa")}
       </div>
 
-      <div className="field">
-        <label>Kcal por 100 g {kcalAuto > 0 && <span className="dim">— calculadas: {kcalAuto}</span>}</label>
-        <input className="input num" inputMode="decimal" value={f.kcal_100} onChange={set("kcal_100")} placeholder={kcalAuto || "0"} />
-      </div>
+      {num("kcal_100", "Kcal por 100 g", kcalAuto > 0 ? <span className="dim">— calculadas: {kcalAuto}</span> : null)}
 
       <button className="btn btn-sm btn-ghost btn-block" onClick={() => setDetalle((d) => !d)}>
         {detalle ? "▴ Menos detalle" : "▾ Fibra, azúcares, saturadas y sodio"}
@@ -103,20 +223,17 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
       {detalle && (
         <>
           <div className="row">
-            <div className="field grow"><label>Fibra</label><input className="input num" inputMode="decimal" value={f.fiber_100} onChange={set("fiber_100")} /></div>
-            <div className="field grow"><label>Azúcares</label><input className="input num" inputMode="decimal" value={f.sugars_100} onChange={set("sugars_100")} /></div>
+            {num("fiber_100", "Fibra")}
+            {num("sugars_100", "Azúcares")}
           </div>
           <div className="row">
-            <div className="field grow"><label>Saturadas</label><input className="input num" inputMode="decimal" value={f.sat_fat_100} onChange={set("sat_fat_100")} /></div>
-            <div className="field grow"><label>Sodio (mg)</label><input className="input num" inputMode="decimal" value={f.sodium_100} onChange={set("sodium_100")} /></div>
+            {num("sat_fat_100", "Saturadas")}
+            {num("sodium_100", "Sodio (mg)")}
           </div>
         </>
       )}
 
-      <div className="field">
-        <label>Ración habitual (g)</label>
-        <input className="input num" inputMode="decimal" value={f.default_serving_g} onChange={set("default_serving_g")} />
-      </div>
+      {num("default_serving_g", "Ración habitual (g)")}
 
       {err && <p className="tiny" style={{ color: "var(--kaki)" }}>{err}</p>}
 

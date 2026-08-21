@@ -16,13 +16,16 @@ nutricionales. Copiar el día anterior de un toque.
 *Recetas*: biblioteca de platos con foto grande; al pulsar se amplía. Cada receta se monta con
 ingredientes reales y la app calcula los macros por ración. Para meter un ingrediente basta con
 buscarlo por el nombre (despensa de casa + Open Food Facts) o pulsar la cámara y **escanear su
-código de barras**. Se marca a quién de la casa le gusta cada plato y se puede filtrar por
+código de barras**. Si el ingrediente no lo conoce nadie, se crea ahí mismo sin salir de la
+receta y se usa al momento. Se marca a quién de la casa le gusta cada plato y se puede filtrar por
 persona o ver solo lo que gusta a todos. Se añaden al diario en un toque.
 
 *Ingredientes*: la despensa de casa. Se van metiendo **escaneando el código de barras** de los
 productos: si están en Open Food Facts se guardan solos con todos sus valores y, si no, se
-rellena la etiqueta a mano. Desde aquí se corrigen y se borran. Lo que hay en esta pestaña es
-lo que luego aparece al montar una receta.
+rellena la etiqueta a mano. Al alta manual también se le puede pegar su código de barras y
+**leer la tabla nutricional con la cámara** (ver abajo), que es lo que más se tarda en teclear.
+Desde aquí se corrigen y se borran. Lo que hay en esta pestaña es lo que luego aparece al
+montar una receta.
 
 **Plan** — Calendario semanal con comida y cena de cada día. Se eligen recetas (filtrando por
 quién se las come) o se apunta texto libre. Copia la semana anterior de un toque. Incluye la
@@ -44,6 +47,36 @@ carbohidrato con la energía restante. Con topes de seguridad: nunca por debajo 
 
 Alimentos: base local compartida + Open Food Facts (búsqueda por texto y por código de barras
 con la cámara).
+
+## El lector de etiquetas
+
+En cualquier alta o corrección de un ingrediente hay un botón **📸 Leer la tabla nutricional**.
+Apuntas con la cámara a la tabla de información nutricional del envase, encajas la tabla dentro
+del marco y disparas (o eliges una foto que ya tengas). La app lee los valores por 100 g
+—kcal, proteína, carbos, grasa, fibra, azúcares, saturadas, sal y el tamaño de la ración— y
+rellena el formulario solo.
+
+Los valores que ha puesto la cámara se marcan con el borde en ámbar: **hay que repasarlos**.
+Un número que no cuadre se cambia a mano como siempre, y en cuanto lo tocas deja de estar
+marcado. Si la foto sale mal, "Repetir la foto"; y con "Ver texto" se ve lo que ha leído tal cual.
+
+Lo que conviene saber:
+
+- Lee **en el móvil**, sin mandar la foto a ningún sitio. Usa
+  [tesseract.js](https://tesseract.projectnaptha.com), que se descarga de internet la primera
+  vez (unos megas) y luego se queda en la caché del navegador.
+- Sale mejor **de cerca, con luz y con la tabla recta**. Las etiquetas arrugadas o con brillos
+  se leen regular.
+- De las dos columnas (por 100 g / por ración) coge la de **100 g**, aunque vengan al revés.
+- Hace un repaso de sentido común: si los macros no cuadran con las kcal, si las saturadas
+  salen mayores que la grasa o si todo junto pasa de 100 g, corrige la coma de sitio. Aun así,
+  repásalo.
+
+## Escanear para no buscar
+
+Todo ingrediente puede llevar su **código de barras**, también los que metes a mano. Con el
+código guardado, la próxima vez que lo quieras meter en una receta o en el diario del día no
+hace falta buscarlo por el nombre: apuntas con la cámara y aparece.
 
 ## Temas
 

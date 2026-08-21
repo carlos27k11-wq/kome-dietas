@@ -7,6 +7,8 @@ import { listFoods, findFoodByBarcode, updateFood, deleteFood, saveFood } from "
 
 // el lector de códigos pesa; solo se descarga cuando se abre la cámara
 const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
+// el lector de etiquetas se baja tesseract de internet; solo cuando se abre
+const LabelScanner = lazy(() => import("../components/LabelScanner"));
 
 /* ============================================================
    La despensa: los ingredientes que hay en casa. Se meten
@@ -15,11 +17,64 @@ const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
    ============================================================ */
 
 /* --- ficha para revisar o corregir un ingrediente ya guardado --- */
+const DEL_LECTOR = [
+  "kcal_100", "protein_100", "carbs_100", "fat_100",
+  "fiber_100", "sugars_100", "sat_fat_100", "sodium_100", "default_serving_g",
+];
+
 function EditFood({ food, onClose, onSaved, toast }) {
   const [f, setF] = useState(food);
   const [busy, setBusy] = useState(false);
-  const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const [code, setCode] = useState(food.barcode || "");
+  const [cam, setCam] = useState(false);
+  const [scanKey, setScanKey] = useState(0);
+  const [lector, setLector] = useState(false);
+  const [leidos, setLeidos] = useState([]);
+  const [aviso, setAviso] = useState("");
+
+  const set = (k) => (e) => {
+    setF((p) => ({ ...p, [k]: e.target.value }));
+    setLeidos((l) => l.filter((x) => x !== k));
+  };
   const n = (v) => (v === "" || v == null ? null : Number(v));
+
+  const num = (k, label) => (
+    <div className="field grow">
+      <label>{label}</label>
+      <input
+        className={"input num" + (leidos.includes(k) ? " ocr" : "")}
+        inputMode="decimal"
+        value={f[k] ?? ""}
+        onChange={set(k)}
+      />
+    </div>
+  );
+
+  const aplicarLectura = useCallback((vals) => {
+    const puestos = DEL_LECTOR.filter((k) => vals[k] != null);
+    setF((p) => {
+      const nuevo = { ...p };
+      for (const k of puestos) nuevo[k] = String(vals[k]);
+      return nuevo;
+    });
+    setLeidos(puestos);
+    setLector(false);
+    setAviso("Valores leídos de la etiqueta. Repásalos antes de guardar.");
+  }, []);
+
+  const onCode = useCallback(async (c) => {
+    if (!c) return;
+    setCam(false);
+    try {
+      const otro = await findFoodByBarcode(c);
+      if (otro && otro.id !== food.id) {
+        setAviso(`Ese código ya es de "${otro.name}".`);
+        return;
+      }
+    } catch { /* seguimos */ }
+    setCode(c);
+    setAviso(`Código ${c} listo. Guarda los cambios para dejarlo puesto.`);
+  }, [food.id]);
 
   async function save() {
     setBusy(true);
@@ -27,6 +82,7 @@ function EditFood({ food, onClose, onSaved, toast }) {
       const saved = await updateFood(food.id, {
         name: f.name.trim(),
         brand: (f.brand || "").trim() || null,
+        barcode: code || null,
         kcal_100: Number(f.kcal_100) || 0,
         protein_100: Number(f.protein_100) || 0,
         carbs_100: Number(f.carbs_100) || 0,
@@ -60,27 +116,64 @@ function EditFood({ food, onClose, onSaved, toast }) {
           <input className="input" value={f.brand || ""} onChange={set("brand")} />
         </div>
 
+        {/* volver a leer la etiqueta con la cámara */}
+        {lector ? (
+          <Suspense fallback={<div className="empty tiny blink">abriendo el lector…</div>}>
+            <LabelScanner onValues={aplicarLectura} onClose={() => setLector(false)} />
+          </Suspense>
+        ) : (
+          <button className="btn btn-block" onClick={() => setLector(true)}>
+            📸 Leer la tabla nutricional
+          </button>
+        )}
+
+        {aviso && <p className="tiny" style={{ color: "var(--kaki)", margin: 0 }}>{aviso}</p>}
+
         <div className="row">
-          <div className="field grow"><label>Proteína</label><input className="input num" inputMode="decimal" value={f.protein_100 ?? ""} onChange={set("protein_100")} /></div>
-          <div className="field grow"><label>Carbos</label><input className="input num" inputMode="decimal" value={f.carbs_100 ?? ""} onChange={set("carbs_100")} /></div>
-          <div className="field grow"><label>Grasa</label><input className="input num" inputMode="decimal" value={f.fat_100 ?? ""} onChange={set("fat_100")} /></div>
+          {num("protein_100", "Proteína")}
+          {num("carbs_100", "Carbos")}
+          {num("fat_100", "Grasa")}
         </div>
         <div className="row">
-          <div className="field grow"><label>Kcal por 100 g</label><input className="input num" inputMode="decimal" value={f.kcal_100 ?? ""} onChange={set("kcal_100")} /></div>
-          <div className="field grow"><label>Ración habitual (g)</label><input className="input num" inputMode="decimal" value={f.default_serving_g ?? ""} onChange={set("default_serving_g")} /></div>
+          {num("kcal_100", "Kcal por 100 g")}
+          {num("default_serving_g", "Ración habitual (g)")}
         </div>
         <div className="row">
-          <div className="field grow"><label>Fibra</label><input className="input num" inputMode="decimal" value={f.fiber_100 ?? ""} onChange={set("fiber_100")} /></div>
-          <div className="field grow"><label>Azúcares</label><input className="input num" inputMode="decimal" value={f.sugars_100 ?? ""} onChange={set("sugars_100")} /></div>
+          {num("fiber_100", "Fibra")}
+          {num("sugars_100", "Azúcares")}
         </div>
         <div className="row">
-          <div className="field grow"><label>Saturadas</label><input className="input num" inputMode="decimal" value={f.sat_fat_100 ?? ""} onChange={set("sat_fat_100")} /></div>
-          <div className="field grow"><label>Sodio (mg)</label><input className="input num" inputMode="decimal" value={f.sodium_100 ?? ""} onChange={set("sodium_100")} /></div>
+          {num("sat_fat_100", "Saturadas")}
+          {num("sodium_100", "Sodio (mg)")}
         </div>
 
-        {food.barcode && (
-          <p className="tiny dim" style={{ margin: 0 }}>Código de barras: <span className="num">{food.barcode}</span></p>
-        )}
+        {/* código de barras: para encontrarlo con la cámara */}
+        <div className="px" style={{ padding: 10 }}>
+          <div className="row-b">
+            <div className="grow">
+              <span className="eyebrow">Código de barras</span>
+              <div className="num tiny">
+                {code || <span className="dim">sin código — se puede escanear</span>}
+              </div>
+            </div>
+            <button
+              className={"btn btn-sm" + (code ? "" : " btn-primary")}
+              onClick={() => { setCam((v) => !v); setScanKey((k) => k + 1); }}
+            >
+              {cam ? "✕" : code ? "📷 Otro" : "📷 Escanear"}
+            </button>
+          </div>
+          {cam && (
+            <div style={{ marginTop: 8 }}>
+              <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
+                <BarcodeScanner key={scanKey} onDetected={onCode} />
+              </Suspense>
+              <button className="btn btn-sm btn-block" onClick={() => setScanKey((k) => k + 1)}>
+                Volver a escanear
+              </button>
+            </div>
+          )}
+        </div>
 
         <button className="btn btn-primary btn-block" disabled={busy || !f.name.trim()} onClick={save}>
           {busy ? "Guardando…" : "Guardar cambios"}

@@ -10,6 +10,7 @@ import { uploadRecipePhoto } from "../lib/supabase";
 import { searchOFF, lookupBarcode } from "../lib/off";
 import { scaleFood } from "../lib/nutrition";
 import { stripUi } from "../components/AddSheet";
+import { ManualFood } from "../components/FoodFinder";
 import IngredientsTab from "./Ingredients";
 
 // el lector de códigos pesa; solo se descarga cuando se abre la cámara
@@ -72,6 +73,8 @@ function IngredientPicker({ onAdd }) {
   const [cam, setCam] = useState(false);
   const [scanKey, setScanKey] = useState(0);
   const [scanMsg, setScanMsg] = useState("");
+  const [suelto, setSuelto] = useState("");   // código escaneado que no conoce nadie
+  const [crear, setCrear] = useState(null);   // alta a mano, con su código si lo hay
 
   useEffect(() => { recentFoods(8).then(setMine).catch(() => {}); }, []);
 
@@ -104,6 +107,8 @@ function IngredientPicker({ onAdd }) {
     setGrams(Number(f.default_serving_g) || 100);
     setCam(false);
     setScanMsg("");
+    setSuelto("");
+    setCrear(null);
   }, []);
 
   const onScan = useCallback(async (code) => {
@@ -114,11 +119,29 @@ function IngredientPicker({ onAdd }) {
       if (local) { choose(local); return; }
       const found = await lookupBarcode(code);
       if (found) { choose(found); return; }
-      setScanMsg(`El código ${code} no está en ninguna base. Créalo en la pestaña de Ingredientes.`);
+      setSuelto(code);
+      setScanMsg(`El código ${code} no está en ninguna base. Créalo aquí mismo y queda guardado con su código.`);
     } catch {
       setScanMsg("Fallo al consultar el código. Prueba otra vez.");
     }
   }, [choose]);
+
+  /* --- ingrediente nuevo: se crea aquí y se usa al momento --- */
+  if (crear !== null) {
+    return (
+      <div className="px" style={{ padding: 12 }}>
+        <div className="row-b" style={{ marginBottom: 10 }}>
+          <strong style={{ fontFamily: "var(--font-display)", fontSize: 15 }}>Ingrediente nuevo</strong>
+          <button className="icon-btn" onClick={() => setCrear(null)} aria-label="Volver al buscador">✕</button>
+        </div>
+        <ManualFood
+          barcode={crear}
+          onCancel={() => setCrear(null)}
+          onSaved={(food) => choose(food)}
+        />
+      </div>
+    );
+  }
 
   /* --- ya hay ingrediente elegido: solo falta la cantidad --- */
   if (sel) {
@@ -187,9 +210,16 @@ function IngredientPicker({ onAdd }) {
             <BarcodeScanner key={scanKey} onDetected={onScan} />
           </Suspense>
           {scanMsg && <p className="tiny" style={{ color: "var(--kaki)", margin: "6px 0" }}>{scanMsg}</p>}
-          <button className="btn btn-sm btn-block" onClick={() => { setScanKey((k) => k + 1); setScanMsg(""); }}>
-            Volver a escanear
-          </button>
+          <div className="row">
+            <button className="btn btn-sm grow" onClick={() => { setScanKey((k) => k + 1); setScanMsg(""); setSuelto(""); }}>
+              Volver a escanear
+            </button>
+            {suelto && (
+              <button className="btn btn-sm btn-primary grow" onClick={() => setCrear(suelto)}>
+                ✎ Crearlo
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -212,7 +242,10 @@ function IngredientPicker({ onAdd }) {
 
       {!loading && q.trim().length >= 2 && !mine.length && !off.length && (
         <div className="empty tiny">
-          Sin resultados. Créalo en la pestaña <strong>Ingredientes</strong> y aparecerá aquí.
+          Sin resultados.
+          <button className="btn btn-sm btn-block" style={{ marginTop: 8 }} onClick={() => setCrear("")}>
+            ✎ Crearlo a mano
+          </button>
         </div>
       )}
     </div>

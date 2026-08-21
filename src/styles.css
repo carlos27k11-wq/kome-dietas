@@ -151,6 +151,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 400; margin: 0; 
   outline: none;
 }
 .input:focus { border-color: var(--sakura); }
+/* valor puesto por el lector de etiquetas: repásalo */
+.input.ocr { border-color: var(--lantern); }
+.input.ocr:focus { border-color: var(--sakura); }
 textarea.input { resize: vertical; min-height: 76px; }
 select.input { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: right 14px center, right 8px center; background-size: 6px 6px; background-repeat: no-repeat; }
 

@@ -1,22 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { leerCodigo, bandaDelVideo, detectorDelMovil, cargarLector } from "../lib/codigos";
 
 /* ============================================================
-   Lector de códigos de barras.
+   Escáner de códigos de barras.
 
-   Tres caminos, de mejor a peor:
-   1. El lector que trae el propio móvil (BarcodeDetector). Es el
-      que mejor va, pero solo lo tienen Chrome y Android.
-   2. html5-qrcode con la cámara a tope de resolución y enfoque
-      continuo — el fallo de antes era pedir la cámara sin exigir
-      tamaño: salía a 640×480 y un EAN-13 se queda sin píxeles.
-   3. Una foto al código: la cámara del móvil dispara a 12 MP con
-      autoenfoque y se lee sobre esa imagen. Va bien siempre.
+   Se pide la cámara a máxima resolución y se descifra el
+   fotograma TAL CUAL sale de ella, no la miniatura que se ve en
+   pantalla: así basta con que el código ocupe una quinta parte
+   del encuadre, en vez de más de media pantalla.
 
-   Y si nada funciona, se escribe el número a mano: son 13 dígitos
-   y con el catálogo cargado se encuentra igual.
+   Si el móvil trae su propio lector (Chrome y Android) se usa
+   ese, que va aún mejor. Y siempre quedan dos salidas: hacerle
+   una foto al código o escribir el número a mano.
    ============================================================ */
-
-const FORMATOS_NATIVOS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
 
 const CAMARA = {
   facingMode: { ideal: "environment" },
@@ -27,31 +23,19 @@ const CAMARA = {
 
 const soloDigitos = (t) => String(t || "").replace(/\D/g, "");
 
-async function detectorNativo() {
-  if (typeof window === "undefined" || !("BarcodeDetector" in window)) return null;
-  try {
-    const soportados = await window.BarcodeDetector.getSupportedFormats();
-    const formats = FORMATOS_NATIVOS.filter((f) => soportados.includes(f));
-    if (!formats.length) return null;
-    return new window.BarcodeDetector({ formats });
-  } catch {
-    return null;
-  }
-}
-
 export default function BarcodeScanner({ onDetected, onError }) {
-  const boxId = useRef(`scan-${Math.random().toString(36).slice(2)}`);
-  const fotoId = useRef(`foto-${Math.random().toString(36).slice(2)}`);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const qrRef = useRef(null);
   const fileRef = useRef(null);
   const done = useRef(false);
   const vivo = useRef(true);
 
-  const [modo, setModo] = useState("cargando"); // cargando | nativo | libreria | manual
+  const [camara, setCamara] = useState(false);
   const [estado, setEstado] = useState("Pidiendo acceso a la cámara…");
   const [aMano, setAMano] = useState("");
+  const [manual, setManual] = useState(false);
+  const [zoom, setZoom] = useState(null);   // {min,max,step,valor} si la cámara deja
+
   const insegura = typeof window !== "undefined" && !window.isSecureContext;
 
   const cantar = useCallback((texto) => {
@@ -65,173 +49,162 @@ export default function BarcodeScanner({ onDetected, onError }) {
   const soltar = useCallback(() => {
     const s = streamRef.current;
     if (s) { s.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
-    const q = qrRef.current;
-    qrRef.current = null;
-    if (q) { try { q.stop().then(() => q.clear()).catch(() => {}); } catch { /* ya estaba */ } }
   }, []);
 
   useEffect(() => () => { vivo.current = false; soltar(); }, [soltar]);
 
-  /* ---------------- arranque ---------------- */
+  /* ---------------- cámara y bucle de lectura ---------------- */
   useEffect(() => {
-    if (insegura) { setModo("manual"); return; }
+    if (insegura || !navigator.mediaDevices?.getUserMedia) {
+      setEstado("Aquí no puedo abrir la cámara. Hazle una foto al código o escríbelo.");
+      setManual(true);
+      return;
+    }
     let cancelado = false;
+    let temporizador = null;
 
     (async () => {
-      const det = await detectorNativo();
+      // el lector se va bajando mientras se pide la cámara
+      const conMovil = detectorDelMovil();
+      cargarLector().catch(() => {});
 
-      /* --- 1. el lector del móvil --- */
-      if (det && navigator.mediaDevices?.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: CAMARA });
-          if (cancelado) { stream.getTracks().forEach((t) => t.stop()); return; }
-          streamRef.current = stream;
-          setModo("nativo");
-          setEstado("Acerca el código hasta llenar el recuadro");
-          const v = videoRef.current;
-          if (v) { v.srcObject = stream; await v.play().catch(() => {}); }
-
-          const mirar = async () => {
-            if (cancelado || done.current || !vivo.current) return;
-            const vid = videoRef.current;
-            if (vid && vid.readyState >= 2) {
-              try {
-                const codigos = await det.detect(vid);
-                if (codigos?.length) { cantar(codigos[0].rawValue); return; }
-              } catch { /* fotograma malo, seguimos */ }
-            }
-            setTimeout(mirar, 120);
-          };
-          mirar();
-          return;
-        } catch (e) {
-          if (cancelado) return;
-          onError?.(e);
-        }
-      }
-
-      /* --- 2. la librería, pidiendo la cámara en condiciones --- */
+      let stream;
       try {
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-        if (cancelado) return;
-        const scanner = new Html5Qrcode(boxId.current, {
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.CODE_128,
-          ],
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-          verbose: false,
-        });
-        qrRef.current = scanner;
-        setModo("libreria");
-        await scanner.start(
-          // el primer argumento solo admite una clave; las condiciones de
-          // verdad (resolución y enfoque) van en videoConstraints
-          { facingMode: "environment" },
-          {
-            fps: 12,
-            // un recuadro grande: cuanto más ancho, más píxeles por barra
-            qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(h * 0.55) }),
-            disableFlip: true,
-            videoConstraints: CAMARA,
-          },
-          (texto) => cantar(texto),
-          () => {}
-        );
-        if (!cancelado) setEstado("Acerca el código hasta llenar el recuadro");
+        stream = await navigator.mediaDevices.getUserMedia({ video: CAMARA });
       } catch (e) {
         if (cancelado) return;
-        setModo("manual");
-        const porque = String(e?.message || e || "").slice(0, 90);
-        setEstado(
-          "No se pudo abrir la cámara" + (porque ? ` (${porque})` : "") +
-          ". Hazle una foto al código o escríbelo."
-        );
+        setEstado(`No se pudo abrir la cámara (${String(e?.name || e).slice(0, 40)}). Hazle una foto al código o escríbelo.`);
+        setManual(true);
         onError?.(e);
+        return;
       }
+      if (cancelado) { stream.getTracks().forEach((t) => t.stop()); return; }
+
+      streamRef.current = stream;
+      setCamara(true);
+      setEstado("Enfoca el código dentro de la franja");
+
+      const v = videoRef.current;
+      if (v) { v.srcObject = stream; await v.play().catch(() => {}); }
+
+      // zoom, si la cámara lo permite: acercar ayuda más que nada
+      const track = stream.getVideoTracks()[0];
+      try {
+        const cap = track.getCapabilities?.();
+        if (cap?.zoom && cap.zoom.max > cap.zoom.min) {
+          setZoom({
+            min: cap.zoom.min, max: Math.min(cap.zoom.max, cap.zoom.min * 5),
+            step: cap.zoom.step || 0.1, valor: track.getSettings?.().zoom ?? cap.zoom.min,
+          });
+        }
+      } catch { /* sin zoom, no pasa nada */ }
+
+      const detector = await conMovil;
+      let avisado = false;
+
+      const mirar = async () => {
+        if (cancelado || done.current || !vivo.current) return;
+        const vid = videoRef.current;
+        if (vid && vid.readyState >= 2) {
+          try {
+            if (detector) {
+              const codigos = await detector.detect(vid);
+              if (codigos?.length) return cantar(codigos[0].rawValue);
+            } else {
+              const banda = bandaDelVideo(vid, 0.5);
+              if (banda) {
+                const code = await leerCodigo(banda);
+                if (code) return cantar(code);
+              }
+            }
+            if (!avisado) { avisado = true; setEstado("Enfoca el código dentro de la franja"); }
+          } catch (e) {
+            if (!avisado) {
+              avisado = true;
+              setEstado(`El lector se ha atascado (${String(e?.message || e).slice(0, 60)}). Prueba con la foto.`);
+            }
+          }
+        }
+        temporizador = setTimeout(mirar, 100);
+      };
+      mirar();
     })();
 
-    return () => { cancelado = true; soltar(); };
+    return () => { cancelado = true; clearTimeout(temporizador); soltar(); };
   }, [cantar, insegura, onError, soltar]);
 
-  /* --- 3. leer el código de una foto --- */
+  const cambiarZoom = useCallback((valor) => {
+    setZoom((z) => (z ? { ...z, valor } : z));
+    const track = streamRef.current?.getVideoTracks?.()[0];
+    track?.applyConstraints?.({ advanced: [{ zoom: valor }] }).catch(() => {});
+  }, []);
+
+  /* --- foto al código: la cámara del móvil enfoca de verdad --- */
   const desdeFoto = useCallback(async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setEstado("Mirando la foto…");
     try {
-      const { Html5Qrcode } = await import("html5-qrcode");
-      // un lector aparte, en su propio hueco: el de la cámara puede estar en marcha
-      const lector = new Html5Qrcode(fotoId.current, { verbose: false });
-      const texto =
-        typeof lector.scanFileV2 === "function"
-          ? (await lector.scanFileV2(file, false)).decodedText
-          : await lector.scanFile(file, false);
-      lector.clear();
-      cantar(texto);
-    } catch {
-      setEstado("En esa foto no se ve el código. Prueba más cerca y con luz.");
+      const code = await leerCodigo(file);
+      if (code) cantar(code);
+      else setEstado("En esa foto no se ve el código. Prueba más cerca, con luz y sin torcerlo.");
+    } catch (err) {
+      setEstado(String(err?.message || "No se pudo leer la foto"));
     }
   }, [cantar]);
 
-  const marco = {
-    position: "absolute", left: "4%", top: "22%", width: "92%", height: "56%",
-    border: "2px dashed var(--sakura)", pointerEvents: "none",
-  };
-
   return (
     <div>
-      {modo === "nativo" ? (
+      {camara && (
         <div style={{ position: "relative", background: "#000", lineHeight: 0 }}>
           <video ref={videoRef} playsInline muted autoPlay
-            style={{ width: "100%", display: "block", maxHeight: "46vh", objectFit: "cover" }} />
-          <div aria-hidden style={marco} />
+            style={{ width: "100%", display: "block", maxHeight: "44vh", objectFit: "cover" }} />
+          {/* la franja marca lo que se está mirando de verdad */}
+          <div aria-hidden style={{
+            position: "absolute", left: 0, top: "25%", width: "100%", height: "50%",
+            borderTop: "2px dashed var(--sakura)", borderBottom: "2px dashed var(--sakura)",
+            pointerEvents: "none",
+          }} />
         </div>
-      ) : (
-        <div
-          id={boxId.current}
-          style={{
-            width: "100%", background: "#000", border: "var(--px) solid var(--line)",
-            overflow: "hidden", minHeight: modo === "manual" ? 0 : 200,
-          }}
-        />
       )}
 
       {estado && <p className="tiny dim center" style={{ margin: "10px 0" }}>{estado}</p>}
+
+      {zoom && (
+        <div className="row" style={{ margin: "0 0 8px" }}>
+          <span className="tiny dim">Zoom</span>
+          <input
+            type="range" className="grow"
+            min={zoom.min} max={zoom.max} step={zoom.step} value={zoom.valor}
+            onChange={(e) => cambiarZoom(Number(e.target.value))}
+          />
+          <span className="tiny num dim">{Number(zoom.valor).toFixed(1)}×</span>
+        </div>
+      )}
 
       <div className="row">
         <button className="btn btn-sm grow" onClick={() => fileRef.current?.click()}>
           📸 Foto al código
         </button>
-        <button className="btn btn-sm grow" onClick={() => { soltar(); setModo("manual"); setEstado(""); }}>
+        <button className="btn btn-sm grow" onClick={() => setManual(true)}>
           ⌨ Escribirlo
         </button>
       </div>
 
-      {modo === "manual" && (
+      {manual && (
         <div className="row" style={{ marginTop: 8 }}>
           <input
-            className="input num grow"
-            inputMode="numeric"
-            placeholder="8480000123456"
+            className="input num grow" inputMode="numeric" placeholder="8480000123456"
             value={aMano}
             onChange={(ev) => setAMano(soloDigitos(ev.target.value).slice(0, 14))}
           />
-          <button
-            className="btn btn-primary btn-sm"
-            disabled={aMano.length < 8}
-            onClick={() => cantar(aMano)}
-          >
+          <button className="btn btn-primary btn-sm" disabled={aMano.length < 8} onClick={() => cantar(aMano)}>
             Buscar
           </button>
         </div>
       )}
 
-      <div id={fotoId.current} style={{ display: "none" }} />
       <input ref={fileRef} type="file" accept="image/*" onChange={desdeFoto} style={{ display: "none" }} />
     </div>
   );

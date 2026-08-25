@@ -99,17 +99,33 @@ Todo ingrediente puede llevar su **código de barras**, también los que metes a
 código guardado, la próxima vez que lo quieras meter en una receta o en el diario del día no
 hace falta buscarlo por el nombre: apuntas con la cámara y aparece.
 
+**Por qué antes no leía casi nunca:** la librería que se usaba descifraba una copia del vídeo
+encogida al tamaño del recuadro que se ve en pantalla —unos 330 píxeles—, así que tiraba a la
+basura toda la resolución de la cámara. Con eso, un código de barras solo se leía si ocupaba más
+de media pantalla. Ahora se descifra el fotograma **tal cual sale de la cámara** (1920 px), y
+basta con que el código ocupe una quinta parte del encuadre. Medido con códigos de prueba:
+
+| Parte del encuadre que ocupa el código | Antes (330 px) | Ahora (nativo) |
+|---|---|---|
+| 20 % | no lee | **lee** |
+| 30 % | no lee | **lee** |
+| 45 % | no lee | **lee** |
+| 60 % o más | lee | **lee** |
+
 El lector prueba por este orden:
 
-1. **El lector del propio móvil** (`BarcodeDetector`), que es el que mejor va. Lo tienen Chrome
-   y Android; Safari no.
-2. **La cámara a máxima resolución con enfoque continuo** y un recuadro ancho. Pedir la cámara
-   sin exigir tamaño era el fallo de antes: salía a 640×480 y las barras de un EAN-13 se
-   quedaban sin píxeles.
-3. **Una foto al código**: la cámara del móvil dispara con autoenfoque y se lee sobre esa
-   imagen. Es la salida buena en iPhone.
+1. **El lector del propio móvil** (`BarcodeDetector`), que trabaja sobre el vídeo a resolución
+   completa. Lo tienen Chrome y Android; Safari no.
+2. **zxing en WebAssembly** sobre la franja central del fotograma, a la resolución de la cámara.
+   Tarda tres milisegundos por fotograma, así que va mirando unas diez veces por segundo. Se
+   descarga de un CDN la primera vez y se queda en la caché.
+3. **Una foto al código**: la cámara del móvil dispara con autoenfoque y se descifra la foto
+   entera. Es la salida buena cuando la luz es mala o el envase está arrugado.
 4. Y si nada funciona, **se escribe el número a mano**: con el catálogo cargado se encuentra
    igual de bien.
+
+Si la cámara deja controlar el zoom, sale un mando debajo del vídeo: acercar el código es lo que
+más ayuda, más que la luz.
 
 ## Temas
 
@@ -165,6 +181,8 @@ añade Supabase Auth y se cambian las políticas de `using (true)` a `using (aut
 
 Datos de alimentos: [Open Food Facts](https://es.openfoodfacts.org), licencia ODbL.
 Tipografías: DotGothic16, Zen Maru Gothic y Silkscreen (Google Fonts).
+Códigos de barras: [zxing-wasm](https://github.com/Sec-ant/zxing-wasm). Etiquetas:
+[tesseract.js](https://tesseract.projectnaptha.com).
 
 ## Trabajar con un solo archivo HTML
 

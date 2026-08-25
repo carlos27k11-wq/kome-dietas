@@ -7,7 +7,7 @@ KEY="${VITE_SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJz
 npx esbuild _vendor.js --bundle --format=iife --minify --target=es2019 \
   --define:process.env.NODE_ENV='"production"' --outfile=.tmp-vendor.js --log-level=warning
 npx esbuild _single.jsx --bundle --format=iife --jsx=transform --target=es2019 \
-  --external:react --external:react-dom/client --external:@supabase/supabase-js --external:html5-qrcode \
+  --external:react --external:react-dom/client --external:@supabase/supabase-js \
   --define:import.meta.env="{\"VITE_SUPABASE_URL\":\"$URL\",\"VITE_SUPABASE_ANON_KEY\":\"$KEY\"}" \
   --outfile=.tmp-app.js --log-level=warning
 node build-html.mjs "$URL" "$KEY"

@@ -5,6 +5,7 @@ import {
   saveFood, saveRecipe, deleteRecipe, getRecipeIngredients,
   toggleRecipeFavorite, addShoppingItems, fmtGrams,
   searchFoods, recentFoods, findFoodByBarcode,
+  searchCatalog, findCatalogByBarcode,
 } from "../lib/store";
 import { uploadRecipePhoto } from "../lib/supabase";
 import { searchOFF, lookupBarcode } from "../lib/off";
@@ -68,6 +69,7 @@ function IngredientPicker({ onAdd }) {
   const [grams, setGrams] = useState(100);
   const [q, setQ] = useState("");
   const [mine, setMine] = useState([]);
+  const [superm, setSuperm] = useState([]);   // Mercadona y Consum
   const [off, setOff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [cam, setCam] = useState(false);
@@ -83,6 +85,7 @@ function IngredientPicker({ onAdd }) {
     const term = q.trim();
     if (term.length < 2) {
       setOff([]);
+      setSuperm([]);
       recentFoods(8).then(setMine).catch(() => {});
       return;
     }
@@ -90,12 +93,16 @@ function IngredientPicker({ onAdd }) {
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const [local, remote] = await Promise.all([
+        const [local, cat, remote] = await Promise.all([
           searchFoods(term, 10).catch(() => []),
+          searchCatalog(term, 12).catch(() => []),
           searchOFF(term, { signal: ctrl.signal }).catch(() => []),
         ]);
         setMine(local);
         const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+        const delSuper = cat.filter((r) => !codes.has(r.barcode));
+        delSuper.forEach((r) => codes.add(r.barcode));
+        setSuperm(delSuper);
         setOff(remote.filter((r) => !codes.has(r.barcode)));
       } finally { setLoading(false); }
     }, 420);
@@ -117,7 +124,9 @@ function IngredientPicker({ onAdd }) {
     try {
       const local = await findFoodByBarcode(code);
       if (local) { choose(local); return; }
-      const found = await lookupBarcode(code);
+      const enSuper = await findCatalogByBarcode(code).catch(() => null);
+      if (enSuper) { choose(enSuper); return; }
+      const found = await lookupBarcode(code).catch(() => null);
       if (found) { choose(found); return; }
       setSuelto(code);
       setScanMsg(`El código ${code} no está en ninguna base. Créalo aquí mismo y queda guardado con su código.`);
@@ -232,6 +241,12 @@ function IngredientPicker({ onAdd }) {
             {mine.map((f) => <IngredientRow key={f.id} f={f} onPick={choose} />)}
           </>
         )}
+        {superm.length > 0 && (
+          <>
+            <div className="eyebrow">Mercadona y Consum</div>
+            {superm.map((f, i) => <IngredientRow key={f.barcode || i} f={f} badge={f.ui_store} onPick={choose} />)}
+          </>
+        )}
         {off.length > 0 && (
           <>
             <div className="eyebrow">Open Food Facts</div>
@@ -240,7 +255,7 @@ function IngredientPicker({ onAdd }) {
         )}
       </div>
 
-      {!loading && q.trim().length >= 2 && !mine.length && !off.length && (
+      {!loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && (
         <div className="empty tiny">
           Sin resultados.
           <button className="btn btn-sm btn-block" style={{ marginTop: 8 }} onClick={() => setCrear("")}>

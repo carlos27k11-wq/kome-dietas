@@ -45,8 +45,29 @@ edad, altura, peso, actividad y objetivo. Calcula el metabolismo basal
 carbohidrato con la energía restante. Con topes de seguridad: nunca por debajo del basal ni de
 1.200 / 1.500 kcal, y grasa mínima de 0,6 g/kg.
 
-Alimentos: base local compartida + Open Food Facts (búsqueda por texto y por código de barras
-con la cámara).
+Alimentos: despensa de casa + catálogo de Mercadona y Consum (12.000 productos guardados en
+vuestro Supabase) + Open Food Facts para todo lo demás. Se busca por texto o por código de
+barras con la cámara.
+
+## El catálogo de Mercadona y Consum
+
+Dentro de la app hay **12.000 productos de Mercadona y de Consum** ya cargados, con su código de
+barras y sus valores nutricionales. Salen al buscar por nombre (sección *Mercadona y Consum*) y
+al escanear un código, antes de salir a internet. Así va rápido y sigue funcionando aunque el
+servidor de Open Food Facts esté caído, que pasa a menudo.
+
+Viven en la tabla `catalog_foods` de Supabase, que es **solo de lectura**: no es tu despensa. Un
+producto solo entra en `foods` cuando lo eliges para una receta o para el diario.
+
+Para volver a bajarlo o actualizarlo:
+
+```bash
+node scripts/catalogo.mjs        # baja de Open Food Facts → data/catalogo-es.json
+node scripts/subir-catalogo.mjs  # lo sube a Supabase (necesita las variables de .env.production)
+```
+
+El segundo pide permiso de escritura sobre `catalog_foods`, que está cerrado: se abre y se
+vuelve a cerrar con una política temporal en Supabase (ver `supabase/schema.sql`).
 
 ## El lector de etiquetas
 
@@ -77,6 +98,18 @@ Lo que conviene saber:
 Todo ingrediente puede llevar su **código de barras**, también los que metes a mano. Con el
 código guardado, la próxima vez que lo quieras meter en una receta o en el diario del día no
 hace falta buscarlo por el nombre: apuntas con la cámara y aparece.
+
+El lector prueba por este orden:
+
+1. **El lector del propio móvil** (`BarcodeDetector`), que es el que mejor va. Lo tienen Chrome
+   y Android; Safari no.
+2. **La cámara a máxima resolución con enfoque continuo** y un recuadro ancho. Pedir la cámara
+   sin exigir tamaño era el fallo de antes: salía a 640×480 y las barras de un EAN-13 se
+   quedaban sin píxeles.
+3. **Una foto al código**: la cámara del móvil dispara con autoenfoque y se lee sobre esa
+   imagen. Es la salida buena en iPhone.
+4. Y si nada funciona, **se escribe el número a mano**: con el catálogo cargado se encuentra
+   igual de bien.
 
 ## Temas
 

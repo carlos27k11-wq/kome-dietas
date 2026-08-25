@@ -223,6 +223,12 @@ export default function LabelScanner({ onValues, onClose }) {
         )}
         <button className="btn grow" onClick={() => fileRef.current?.click()}>🖼 Elegir foto</button>
       </div>
+      {hayCamara && (
+        <p className="tiny dim" style={{ margin: "8px 0 0" }}>
+          ¿Sale mal? Hazle una foto normal a la etiqueta con la cámara del móvil y elígela con
+          🖼: sale mucho más nítida que el vídeo y se lee bastante mejor.
+        </p>
+      )}
       {onClose && (
         <button className="btn btn-sm btn-ghost btn-block" style={{ marginTop: 8 }} onClick={onClose}>
           Cerrar el lector

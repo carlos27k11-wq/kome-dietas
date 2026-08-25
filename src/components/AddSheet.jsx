@@ -5,7 +5,10 @@ import { useTheme } from "./theme";
 // el lector de códigos pesa; se carga solo cuando hace falta
 const BarcodeScanner = lazy(() => import("./BarcodeScanner"));
 import { searchOFF, lookupBarcode, NUTRISCORE_COLOR } from "../lib/off";
-import { searchFoods, recentFoods, saveFood, bumpFood, findFoodByBarcode } from "../lib/store";
+import {
+  searchFoods, recentFoods, saveFood, bumpFood, findFoodByBarcode,
+  searchCatalog, findCatalogByBarcode,
+} from "../lib/store";
 import { scaleFood, scaleRecipe, energyCheck, MEALS } from "../lib/nutrition";
 
 const TABS = [
@@ -210,13 +213,14 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
   const [tab, setTab] = useState("buscar");
   const [q, setQ] = useState("");
   const [mine, setMine] = useState([]);
+  const [superm, setSuperm] = useState([]);   // Mercadona y Consum
   const [off, setOff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [picked, setPicked] = useState(null); // {item, kind}
   const [scanMsg, setScanMsg] = useState("");
 
   useEffect(() => {
-    if (!open) { setPicked(null); setQ(""); setOff([]); setTab("buscar"); setScanMsg(""); }
+    if (!open) { setPicked(null); setQ(""); setOff([]); setSuperm([]); setTab("buscar"); setScanMsg(""); }
   }, [open]);
 
   useEffect(() => {
@@ -224,22 +228,26 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
     recentFoods().then(setMine).catch(() => {});
   }, [open]);
 
-  // búsqueda con retardo: primero lo nuestro, luego Open Food Facts
+  // búsqueda con retardo: la despensa, el súper y por último internet
   useEffect(() => {
     if (!open || tab !== "buscar") return;
     const term = q.trim();
-    if (term.length < 2) { setOff([]); recentFoods().then(setMine).catch(() => {}); return; }
+    if (term.length < 2) { setOff([]); setSuperm([]); recentFoods().then(setMine).catch(() => {}); return; }
     const ctrl = new AbortController();
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const [local, remote] = await Promise.all([
+        const [local, cat, remote] = await Promise.all([
           searchFoods(term).catch(() => []),
+          searchCatalog(term, 12).catch(() => []),
           searchOFF(term, { signal: ctrl.signal }).catch(() => []),
         ]);
         setMine(local);
-        const localCodes = new Set(local.map((f) => f.barcode).filter(Boolean));
-        setOff(remote.filter((r) => !localCodes.has(r.barcode)));
+        const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+        const delSuper = cat.filter((r) => !codes.has(r.barcode));
+        delSuper.forEach((r) => codes.add(r.barcode));
+        setSuperm(delSuper);
+        setOff(remote.filter((r) => !codes.has(r.barcode)));
       } finally { setLoading(false); }
     }, 420);
     return () => { clearTimeout(t); ctrl.abort(); };
@@ -277,9 +285,11 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
     try {
       const local = await findFoodByBarcode(code);
       if (local) { setPicked({ item: local, kind: "food" }); return; }
-      const found = await lookupBarcode(code);
+      const enSuper = await findCatalogByBarcode(code).catch(() => null);
+      if (enSuper) { setPicked({ item: enSuper, kind: "food" }); return; }
+      const found = await lookupBarcode(code).catch(() => null);
       if (found) setPicked({ item: found, kind: "food" });
-      else setScanMsg(`El código ${code} no está en Open Food Facts. Añádelo con "Rápido" o créalo a mano.`);
+      else setScanMsg(`El código ${code} no está en ninguna base. Añádelo con "Rápido" o créalo en Ingredientes.`);
     } catch {
       setScanMsg("Fallo al consultar el código. Prueba otra vez.");
     }
@@ -322,6 +332,16 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
                 </>
               )}
 
+              {superm.length > 0 && (
+                <>
+                  <div className="eyebrow">Mercadona y Consum</div>
+                  {superm.map((f, i) => (
+                    <FoodRow key={f.barcode || i} food={f} badge={f.ui_store}
+                      onPick={(x) => setPicked({ item: x, kind: "food" })} />
+                  ))}
+                </>
+              )}
+
               {off.length > 0 && (
                 <>
                   <div className="eyebrow">Open Food Facts</div>
@@ -331,7 +351,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
                 </>
               )}
 
-              {!loading && q.trim().length >= 2 && !mine.length && !off.length && (
+              {!loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && (
                 <div className="empty tiny">Sin resultados. Créalo desde “Rápido”.</div>
               )}
             </>
@@ -382,6 +402,6 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
 
 /** quita campos que no existen en la tabla foods */
 export function stripUi(f) {
-  const { nutriscore, nova, ...rest } = f;
+  const { nutriscore, nova, ui_store, ...rest } = f;
   return rest;
 }

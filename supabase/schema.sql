@@ -228,3 +228,45 @@ alter table public.profiles
   drop constraint if exists profiles_theme_check;
 alter table public.profiles
   add constraint profiles_theme_check check (theme in ('kome','claro'));
+
+-- ============================================================
+-- Catálogo de supermercado: Mercadona y Consum, bajado de Open
+-- Food Facts con scripts/catalogo.mjs. Es solo de consulta; la
+-- despensa de casa sigue siendo public.foods.
+-- ============================================================
+create extension if not exists pg_trgm with schema extensions;
+
+create table if not exists public.catalog_foods (
+  barcode            text primary key,
+  name               text not null,
+  brand              text,
+  store              text,
+  kcal_100           real not null default 0,
+  protein_100        real not null default 0,
+  carbs_100          real not null default 0,
+  fat_100            real not null default 0,
+  fiber_100          real,
+  sugars_100         real,
+  sat_fat_100        real,
+  sodium_100         real,
+  default_serving_g  real default 100,
+  serving_name       text,
+  quantity           text,
+  image_url          text,
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.catalog_foods enable row level security;
+drop policy if exists "catalogo lectura" on public.catalog_foods;
+create policy "catalogo lectura" on public.catalog_foods for select using (true);
+
+create index if not exists catalog_foods_name_trgm
+  on public.catalog_foods using gin (name extensions.gin_trgm_ops);
+create index if not exists catalog_foods_store_idx on public.catalog_foods (store);
+
+-- Para cargar el catálogo desde el portátil hay que abrir la escritura
+-- un momento y volver a cerrarla al terminar:
+--   create policy "catalogo carga temporal" on public.catalog_foods
+--     for all using (true) with check (true);
+--   ... node scripts/subir-catalogo.mjs ...
+--   drop policy "catalogo carga temporal" on public.catalog_foods;

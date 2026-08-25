@@ -3,7 +3,9 @@ import { Sheet } from "../components/ui";
 import { ManualFood } from "../components/FoodFinder";
 import { useTheme } from "../components/theme";
 import { lookupBarcode } from "../lib/off";
-import { listFoods, findFoodByBarcode, updateFood, deleteFood, saveFood } from "../lib/store";
+import {
+  listFoods, findFoodByBarcode, updateFood, deleteFood, saveFood, findCatalogByBarcode,
+} from "../lib/store";
 
 // el lector de códigos pesa; solo se descarga cuando se abre la cámara
 const BarcodeScanner = lazy(() => import("../components/BarcodeScanner"));
@@ -221,9 +223,11 @@ function ScanNew({ open, onClose, onSaved, toast }) {
         setBusy(false);
         return;
       }
-      const found = await lookupBarcode(code);
+      const found =
+        (await findCatalogByBarcode(code).catch(() => null)) ||
+        (await lookupBarcode(code).catch(() => null));
       if (found) {
-        const { nutriscore, nova, ...limpio } = found;
+        const { nutriscore, nova, ui_store, ...limpio } = found;
         const saved = await saveFood(limpio);
         toast(`Añadido: ${saved.name}`);
         onSaved(saved);
@@ -256,8 +260,9 @@ function ScanNew({ open, onClose, onSaved, toast }) {
       ) : (
         <div className="stack">
           <p className="tiny dim" style={{ margin: 0 }}>
-            Apunta con la cámara al código de barras del producto. Si está en Open Food Facts se
-            guarda solo con todos sus valores; si no, te dejo rellenar la etiqueta a mano.
+            Apunta con la cámara al código de barras del producto. Si lo tenemos en el catálogo
+            de Mercadona y Consum o en Open Food Facts, se guarda solo con todos sus valores;
+            si no, te dejo rellenar la etiqueta a mano.
           </p>
           <Suspense fallback={<div className="empty tiny blink">abriendo la cámara…</div>}>
             <BarcodeScanner key={scanKey} onDetected={onDetected} />

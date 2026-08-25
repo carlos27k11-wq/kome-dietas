@@ -1,7 +1,10 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useTheme } from "./theme";
 import { searchOFF, lookupBarcode } from "../lib/off";
-import { searchFoods, recentFoods, saveFood, findFoodByBarcode } from "../lib/store";
+import {
+  searchFoods, recentFoods, saveFood, findFoodByBarcode,
+  searchCatalog, findCatalogByBarcode,
+} from "../lib/store";
 import { FoodRow, stripUi } from "./AddSheet";
 
 // el lector pesa 300 kB; solo se carga si abres su pestaña
@@ -73,7 +76,9 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
         setAviso(`Ojo: "${yaEsta.name}" ya está en la despensa con este código.`);
         return;
       }
-      const found = await lookupBarcode(c);
+      const found =
+        (await findCatalogByBarcode(c).catch(() => null)) ||
+        (await lookupBarcode(c).catch(() => null));
       if (!found) return;
       // si Open Food Facts lo conoce, rellenamos lo que esté en blanco
       setF((p) => {
@@ -85,7 +90,7 @@ export function ManualFood({ barcode = "", onSaved, onCancel }) {
         }
         return nuevo;
       });
-      setAviso(`Encontrado en Open Food Facts: ${found.name}. Repasa los valores.`);
+      setAviso(`Encontrado: ${found.name}. Repasa los valores.`);
     } catch {
       /* sin conexión: nos quedamos con el código y ya está */
     }
@@ -257,6 +262,7 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
   const [tab, setTab] = useState("buscar");
   const [q, setQ] = useState("");
   const [mine, setMine] = useState([]);
+  const [superm, setSuper_] = useState([]);   // Mercadona y Consum
   const [off, setOff] = useState([]);
   const [loading, setLoading] = useState(false);
   const [scanMsg, setScanMsg] = useState("");
@@ -271,6 +277,7 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
     const term = q.trim();
     if (term.length < 2) {
       setOff([]);
+      setSuper_([]);
       recentFoods(8).then(setMine).catch(() => {});
       return;
     }
@@ -278,12 +285,16 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
     setLoading(true);
     const t = setTimeout(async () => {
       try {
-        const [local, remote] = await Promise.all([
+        const [local, cat, remote] = await Promise.all([
           searchFoods(term, 8).catch(() => []),
+          searchCatalog(term, 12).catch(() => []),
           searchOFF(term, { signal: ctrl.signal }).catch(() => []),
         ]);
         setMine(local);
         const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+        const delSuper = cat.filter((r) => !codes.has(r.barcode));
+        delSuper.forEach((r) => codes.add(r.barcode));
+        setSuper_(delSuper);
         setOff(remote.filter((r) => !codes.has(r.barcode)));
       } finally {
         setLoading(false);
@@ -298,7 +309,9 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
     try {
       const local = await findFoodByBarcode(code);
       if (local) { onPick(local); return; }
-      const found = await lookupBarcode(code);
+      const enSuper = await findCatalogByBarcode(code).catch(() => null);
+      if (enSuper) { onPick(enSuper); return; }
+      const found = await lookupBarcode(code).catch(() => null);
       if (found) { onPick(found); return; }
       setScanBarcode(code);
       setScanMsg("");
@@ -331,6 +344,14 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
                 {mine.map((f) => <FoodRow key={f.id} food={f} onPick={onPick} />)}
               </>
             )}
+            {superm.length > 0 && (
+              <>
+                <div className="eyebrow">Mercadona y Consum</div>
+                {superm.map((f, i) => (
+                  <FoodRow key={f.barcode || i} food={f} badge={f.ui_store} onPick={onPick} />
+                ))}
+              </>
+            )}
             {off.length > 0 && (
               <>
                 <div className="eyebrow">Open Food Facts</div>
@@ -339,7 +360,7 @@ export default function FoodFinder({ onPick, placeholder = "Busca un alimento…
             )}
           </div>
 
-          {!loading && q.trim().length >= 2 && !mine.length && !off.length && (
+          {!loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && (
             <div className="empty tiny">
               Sin resultados.
               <button className="btn btn-sm btn-block" style={{ marginTop: 8 }} onClick={() => setTab("manual")}>

@@ -59,6 +59,35 @@ export async function findFoodByBarcode(code) {
   return data;
 }
 
+/* ============================================================
+   Catálogo de supermercado: lo que hay en Mercadona y Consum,
+   bajado de Open Food Facts (tabla catalog_foods, solo lectura).
+   Se consulta antes de salir a internet, así que va rápido y
+   funciona aunque su servidor esté caído.
+   ============================================================ */
+function delCatalogo(r) {
+  const { store, quantity, updated_at, ...resto } = r;
+  return { ...resto, source: "off", off_id: r.barcode, ui_store: store };
+}
+
+export async function searchCatalog(q, limit = 12) {
+  const term = (q || "").trim();
+  if (term.length < 2) return [];
+  let qb = supabase.from("catalog_foods").select("*").limit(limit);
+  // todas las palabras tienen que estar en el nombre
+  for (const palabra of term.split(/\s+/).slice(0, 4)) qb = qb.ilike("name", `%${palabra}%`);
+  const { data, error } = await qb.order("name");
+  if (error) throw error;
+  return (data || []).map(delCatalogo);
+}
+
+export async function findCatalogByBarcode(code) {
+  const { data, error } = await supabase
+    .from("catalog_foods").select("*").eq("barcode", String(code)).maybeSingle();
+  if (error) throw error;
+  return data ? delCatalogo(data) : null;
+}
+
 export async function saveFood(food) {
   if (food.barcode) {
     const existing = await findFoodByBarcode(food.barcode);

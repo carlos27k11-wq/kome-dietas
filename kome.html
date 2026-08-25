@@ -909,65 +909,230 @@ react-dom/cjs/react-dom.production.min.js:
   __export(BarcodeScanner_exports, {
     default: () => BarcodeScanner
   });
+  async function detectorNativo() {
+    if (typeof window === "undefined" || !("BarcodeDetector" in window)) return null;
+    try {
+      const soportados = await window.BarcodeDetector.getSupportedFormats();
+      const formats = FORMATOS_NATIVOS.filter((f) => soportados.includes(f));
+      if (!formats.length) return null;
+      return new window.BarcodeDetector({ formats });
+    } catch {
+      return null;
+    }
+  }
   function BarcodeScanner({ onDetected, onError }) {
     const boxId = (0, import_react6.useRef)(`scan-${Math.random().toString(36).slice(2)}`);
-    const scannerRef = (0, import_react6.useRef)(null);
-    const [status, setStatus] = (0, import_react6.useState)("Pidiendo acceso a la c\xE1mara\u2026");
+    const fotoId = (0, import_react6.useRef)(`foto-${Math.random().toString(36).slice(2)}`);
+    const videoRef = (0, import_react6.useRef)(null);
+    const streamRef = (0, import_react6.useRef)(null);
+    const qrRef = (0, import_react6.useRef)(null);
+    const fileRef = (0, import_react6.useRef)(null);
     const done = (0, import_react6.useRef)(false);
-    const insecure = typeof window !== "undefined" && !window.isSecureContext;
-    (0, import_react6.useEffect)(() => {
-      if (insecure) return;
-      let cancelled = false;
-      const scanner = new import_html5_qrcode.Html5Qrcode(boxId.current, { formatsToSupport: FORMATS, verbose: false });
-      scannerRef.current = scanner;
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 150 }, aspectRatio: 1.4 },
-        (text) => {
-          if (done.current) return;
-          done.current = true;
-          if (navigator.vibrate) navigator.vibrate(35);
-          onDetected == null ? void 0 : onDetected(text.replace(/\D/g, ""));
-        },
-        () => {
-        }
-      ).then(() => !cancelled && setStatus("Enfoca el c\xF3digo de barras")).catch((e) => {
-        setStatus("No se pudo abrir la c\xE1mara. Revisa los permisos del navegador.");
-        onError == null ? void 0 : onError(e);
-      });
-      return () => {
-        cancelled = true;
-        const s = scannerRef.current;
-        if (s) {
-          s.stop().then(() => s.clear()).catch(() => {
+    const vivo = (0, import_react6.useRef)(true);
+    const [modo, setModo] = (0, import_react6.useState)("cargando");
+    const [estado, setEstado] = (0, import_react6.useState)("Pidiendo acceso a la c\xE1mara\u2026");
+    const [aMano, setAMano] = (0, import_react6.useState)("");
+    const insegura = typeof window !== "undefined" && !window.isSecureContext;
+    const cantar = (0, import_react6.useCallback)((texto) => {
+      const code = soloDigitos(texto);
+      if (!code || done.current) return;
+      done.current = true;
+      if (navigator.vibrate) navigator.vibrate(35);
+      onDetected == null ? void 0 : onDetected(code);
+    }, [onDetected]);
+    const soltar = (0, import_react6.useCallback)(() => {
+      const s = streamRef.current;
+      if (s) {
+        s.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      const q = qrRef.current;
+      qrRef.current = null;
+      if (q) {
+        try {
+          q.stop().then(() => q.clear()).catch(() => {
           });
+        } catch {
         }
+      }
+    }, []);
+    (0, import_react6.useEffect)(() => () => {
+      vivo.current = false;
+      soltar();
+    }, [soltar]);
+    (0, import_react6.useEffect)(() => {
+      if (insegura) {
+        setModo("manual");
+        return;
+      }
+      let cancelado = false;
+      (async () => {
+        var _a;
+        const det = await detectorNativo();
+        if (det && ((_a = navigator.mediaDevices) == null ? void 0 : _a.getUserMedia)) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: CAMARA });
+            if (cancelado) {
+              stream.getTracks().forEach((t) => t.stop());
+              return;
+            }
+            streamRef.current = stream;
+            setModo("nativo");
+            setEstado("Acerca el c\xF3digo hasta llenar el recuadro");
+            const v = videoRef.current;
+            if (v) {
+              v.srcObject = stream;
+              await v.play().catch(() => {
+              });
+            }
+            const mirar = async () => {
+              if (cancelado || done.current || !vivo.current) return;
+              const vid = videoRef.current;
+              if (vid && vid.readyState >= 2) {
+                try {
+                  const codigos = await det.detect(vid);
+                  if (codigos == null ? void 0 : codigos.length) {
+                    cantar(codigos[0].rawValue);
+                    return;
+                  }
+                } catch {
+                }
+              }
+              setTimeout(mirar, 120);
+            };
+            mirar();
+            return;
+          } catch (e) {
+            if (cancelado) return;
+            onError == null ? void 0 : onError(e);
+          }
+        }
+        try {
+          const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
+          if (cancelado) return;
+          const scanner = new Html5Qrcode(boxId.current, {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.CODE_128
+            ],
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+            verbose: false
+          });
+          qrRef.current = scanner;
+          setModo("libreria");
+          await scanner.start(
+            CAMARA,
+            {
+              fps: 12,
+              // un recuadro grande: cuanto más ancho, más píxeles por barra
+              qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(h * 0.55) }),
+              disableFlip: true
+            },
+            (texto) => cantar(texto),
+            () => {
+            }
+          );
+          if (!cancelado) setEstado("Acerca el c\xF3digo hasta llenar el recuadro");
+        } catch (e) {
+          if (cancelado) return;
+          setModo("manual");
+          setEstado("No se pudo abrir la c\xE1mara. Escribe el c\xF3digo o hazle una foto.");
+          onError == null ? void 0 : onError(e);
+        }
+      })();
+      return () => {
+        cancelado = true;
+        soltar();
       };
-    }, [onDetected, onError, insecure]);
-    if (insecure) {
-      return /* @__PURE__ */ import_react6.default.createElement("div", { className: "empty" }, /* @__PURE__ */ import_react6.default.createElement("p", { className: "tiny" }, "La c\xE1mara solo funciona en p\xE1ginas seguras. Est\xE1s abriendo el archivo directamente desde el disco."), /* @__PURE__ */ import_react6.default.createElement("p", { className: "tiny dim" }, "Arranca un servidor local (", /* @__PURE__ */ import_react6.default.createElement("code", null, "npx serve"), " o ", /* @__PURE__ */ import_react6.default.createElement("code", null, "python3 -m http.server"), ") y entra por ", /* @__PURE__ */ import_react6.default.createElement("code", null, "http://localhost"), ", o usa la versi\xF3n publicada. Mientras tanto, busca el alimento por su nombre."));
-    }
-    return /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement(
+    }, [cantar, insegura, onError, soltar]);
+    const desdeFoto = (0, import_react6.useCallback)(async (e) => {
+      var _a;
+      const file = (_a = e.target.files) == null ? void 0 : _a[0];
+      e.target.value = "";
+      if (!file) return;
+      setEstado("Mirando la foto\u2026");
+      try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        const lector = new Html5Qrcode(fotoId.current, { verbose: false });
+        const texto = typeof lector.scanFileV2 === "function" ? (await lector.scanFileV2(file, false)).decodedText : await lector.scanFile(file, false);
+        lector.clear();
+        cantar(texto);
+      } catch {
+        setEstado("En esa foto no se ve el c\xF3digo. Prueba m\xE1s cerca y con luz.");
+      }
+    }, [cantar]);
+    const marco = {
+      position: "absolute",
+      left: "4%",
+      top: "22%",
+      width: "92%",
+      height: "56%",
+      border: "2px dashed var(--sakura)",
+      pointerEvents: "none"
+    };
+    return /* @__PURE__ */ import_react6.default.createElement("div", null, modo === "nativo" ? /* @__PURE__ */ import_react6.default.createElement("div", { style: { position: "relative", background: "#000", lineHeight: 0 } }, /* @__PURE__ */ import_react6.default.createElement(
+      "video",
+      {
+        ref: videoRef,
+        playsInline: true,
+        muted: true,
+        autoPlay: true,
+        style: { width: "100%", display: "block", maxHeight: "46vh", objectFit: "cover" }
+      }
+    ), /* @__PURE__ */ import_react6.default.createElement("div", { "aria-hidden": true, style: marco })) : /* @__PURE__ */ import_react6.default.createElement(
       "div",
       {
         id: boxId.current,
-        style: { width: "100%", background: "#000", border: "var(--px) solid var(--line)", overflow: "hidden", minHeight: 200 }
+        style: {
+          width: "100%",
+          background: "#000",
+          border: "var(--px) solid var(--line)",
+          overflow: "hidden",
+          minHeight: modo === "manual" ? 0 : 200
+        }
       }
-    ), /* @__PURE__ */ import_react6.default.createElement("p", { className: "tiny dim center", style: { marginTop: 10 } }, status));
+    ), estado && /* @__PURE__ */ import_react6.default.createElement("p", { className: "tiny dim center", style: { margin: "10px 0" } }, estado), /* @__PURE__ */ import_react6.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react6.default.createElement("button", { className: "btn btn-sm grow", onClick: () => {
+      var _a;
+      return (_a = fileRef.current) == null ? void 0 : _a.click();
+    } }, "\u{1F4F8} Foto al c\xF3digo"), /* @__PURE__ */ import_react6.default.createElement("button", { className: "btn btn-sm grow", onClick: () => {
+      soltar();
+      setModo("manual");
+      setEstado("");
+    } }, "\u2328 Escribirlo")), modo === "manual" && /* @__PURE__ */ import_react6.default.createElement("div", { className: "row", style: { marginTop: 8 } }, /* @__PURE__ */ import_react6.default.createElement(
+      "input",
+      {
+        className: "input num grow",
+        inputMode: "numeric",
+        placeholder: "8480000123456",
+        value: aMano,
+        onChange: (ev) => setAMano(soloDigitos(ev.target.value).slice(0, 14))
+      }
+    ), /* @__PURE__ */ import_react6.default.createElement(
+      "button",
+      {
+        className: "btn btn-primary btn-sm",
+        disabled: aMano.length < 8,
+        onClick: () => cantar(aMano)
+      },
+      "Buscar"
+    )), /* @__PURE__ */ import_react6.default.createElement("div", { id: fotoId.current, style: { display: "none" } }), /* @__PURE__ */ import_react6.default.createElement("input", { ref: fileRef, type: "file", accept: "image/*", onChange: desdeFoto, style: { display: "none" } }));
   }
-  var import_react6, import_html5_qrcode, FORMATS;
+  var import_react6, FORMATOS_NATIVOS, CAMARA, soloDigitos;
   var init_BarcodeScanner = __esm({
     "src/components/BarcodeScanner.jsx"() {
       init_define_import_meta_env();
       import_react6 = __toESM(__require("react"), 1);
-      import_html5_qrcode = __require("html5-qrcode");
-      FORMATS = [
-        import_html5_qrcode.Html5QrcodeSupportedFormats.EAN_13,
-        import_html5_qrcode.Html5QrcodeSupportedFormats.EAN_8,
-        import_html5_qrcode.Html5QrcodeSupportedFormats.UPC_A,
-        import_html5_qrcode.Html5QrcodeSupportedFormats.UPC_E,
-        import_html5_qrcode.Html5QrcodeSupportedFormats.CODE_128
-      ];
+      FORMATOS_NATIVOS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+      CAMARA = {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: "continuous" }]
+      };
+      soloDigitos = (t) => String(t || "").replace(/\D/g, "");
     }
   });
 
@@ -1463,7 +1628,7 @@ react-dom/cjs/react-dom.production.min.js:
     )) : /* @__PURE__ */ import_react9.default.createElement("p", { className: "tiny dim", style: { margin: 0 } }, typeof window !== "undefined" && !window.isSecureContext ? "Aqu\xED no puedo abrir la c\xE1mara: hace falta una p\xE1gina segura (un servidor local o la versi\xF3n publicada)." : "Este navegador no me deja abrir la c\xE1mara.", " ", "Haz la foto con el m\xF3vil, el\xEDgela abajo y la leo igual."), estado && /* @__PURE__ */ import_react9.default.createElement("p", { className: "tiny dim center", style: { margin: "8px 0" } }, estado), err && /* @__PURE__ */ import_react9.default.createElement("p", { className: "tiny center", style: { color: "var(--kaki)", margin: "0 0 8px" } }, err), /* @__PURE__ */ import_react9.default.createElement("div", { className: "row" }, hayCamara && /* @__PURE__ */ import_react9.default.createElement("button", { className: "btn btn-primary grow", onClick: disparar }, "\u{1F4F8} Hacer la foto"), /* @__PURE__ */ import_react9.default.createElement("button", { className: "btn grow", onClick: () => {
       var _a2;
       return (_a2 = fileRef.current) == null ? void 0 : _a2.click();
-    } }, "\u{1F5BC} Elegir foto")), onClose && /* @__PURE__ */ import_react9.default.createElement("button", { className: "btn btn-sm btn-ghost btn-block", style: { marginTop: 8 }, onClick: onClose }, "Cerrar el lector"), /* @__PURE__ */ import_react9.default.createElement(
+    } }, "\u{1F5BC} Elegir foto")), hayCamara && /* @__PURE__ */ import_react9.default.createElement("p", { className: "tiny dim", style: { margin: "8px 0 0" } }, "\xBFSale mal? Hazle una foto normal a la etiqueta con la c\xE1mara del m\xF3vil y el\xEDgela con \u{1F5BC}: sale mucho m\xE1s n\xEDtida que el v\xEDdeo y se lee bastante mejor."), onClose && /* @__PURE__ */ import_react9.default.createElement("button", { className: "btn btn-sm btn-ghost btn-block", style: { marginTop: 8 }, onClick: onClose }, "Cerrar el lector"), /* @__PURE__ */ import_react9.default.createElement(
       "input",
       {
         ref: fileRef,
@@ -1966,6 +2131,24 @@ react-dom/cjs/react-dom.production.min.js:
     const { data, error } = await supabase.from("foods").select("*").eq("barcode", code).maybeSingle();
     if (error) throw error;
     return data;
+  }
+  function delCatalogo(r) {
+    const { store, quantity, updated_at, ...resto } = r;
+    return { ...resto, source: "off", off_id: r.barcode, ui_store: store };
+  }
+  async function searchCatalog(q, limit = 12) {
+    const term = (q || "").trim();
+    if (term.length < 2) return [];
+    let qb = supabase.from("catalog_foods").select("*").limit(limit);
+    for (const palabra of term.split(/\s+/).slice(0, 4)) qb = qb.ilike("name", `%${palabra}%`);
+    const { data, error } = await qb.order("name");
+    if (error) throw error;
+    return (data || []).map(delCatalogo);
+  }
+  async function findCatalogByBarcode(code) {
+    const { data, error } = await supabase.from("catalog_foods").select("*").eq("barcode", String(code)).maybeSingle();
+    if (error) throw error;
+    return data ? delCatalogo(data) : null;
   }
   async function saveFood(food) {
     if (food.barcode) {
@@ -2563,6 +2746,7 @@ react-dom/cjs/react-dom.production.min.js:
     const [tab, setTab] = (0, import_react7.useState)("buscar");
     const [q, setQ] = (0, import_react7.useState)("");
     const [mine, setMine] = (0, import_react7.useState)([]);
+    const [superm, setSuperm] = (0, import_react7.useState)([]);
     const [off, setOff] = (0, import_react7.useState)([]);
     const [loading, setLoading] = (0, import_react7.useState)(false);
     const [picked, setPicked] = (0, import_react7.useState)(null);
@@ -2572,6 +2756,7 @@ react-dom/cjs/react-dom.production.min.js:
         setPicked(null);
         setQ("");
         setOff([]);
+        setSuperm([]);
         setTab("buscar");
         setScanMsg("");
       }
@@ -2586,6 +2771,7 @@ react-dom/cjs/react-dom.production.min.js:
       const term = q.trim();
       if (term.length < 2) {
         setOff([]);
+        setSuperm([]);
         recentFoods().then(setMine).catch(() => {
         });
         return;
@@ -2594,13 +2780,17 @@ react-dom/cjs/react-dom.production.min.js:
       setLoading(true);
       const t = setTimeout(async () => {
         try {
-          const [local, remote] = await Promise.all([
+          const [local, cat, remote] = await Promise.all([
             searchFoods(term).catch(() => []),
+            searchCatalog(term, 12).catch(() => []),
             searchOFF(term, { signal: ctrl.signal }).catch(() => [])
           ]);
           setMine(local);
-          const localCodes = new Set(local.map((f) => f.barcode).filter(Boolean));
-          setOff(remote.filter((r) => !localCodes.has(r.barcode)));
+          const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+          const delSuper = cat.filter((r) => !codes.has(r.barcode));
+          delSuper.forEach((r) => codes.add(r.barcode));
+          setSuperm(delSuper);
+          setOff(remote.filter((r) => !codes.has(r.barcode)));
         } finally {
           setLoading(false);
         }
@@ -2654,9 +2844,14 @@ react-dom/cjs/react-dom.production.min.js:
           setPicked({ item: local, kind: "food" });
           return;
         }
-        const found = await lookupBarcode(code);
+        const enSuper = await findCatalogByBarcode(code).catch(() => null);
+        if (enSuper) {
+          setPicked({ item: enSuper, kind: "food" });
+          return;
+        }
+        const found = await lookupBarcode(code).catch(() => null);
         if (found) setPicked({ item: found, kind: "food" });
-        else setScanMsg(`El c\xF3digo ${code} no est\xE1 en Open Food Facts. A\xF1\xE1delo con "R\xE1pido" o cr\xE9alo a mano.`);
+        else setScanMsg(`El c\xF3digo ${code} no est\xE1 en ninguna base. A\xF1\xE1delo con "R\xE1pido" o cr\xE9alo en Ingredientes.`);
       } catch {
         setScanMsg("Fallo al consultar el c\xF3digo. Prueba otra vez.");
       }
@@ -2680,7 +2875,15 @@ react-dom/cjs/react-dom.production.min.js:
         onChange: (e) => setQ(e.target.value),
         placeholder: "Yogur griego, arroz, pechuga\u2026"
       }
-    ), loading && /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), mine.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.id, food: f, onPick: (x) => setPicked({ item: x, kind: "food" }) }))), off.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.barcode || i, food: f, badge: "nuevo", onPick: (x) => setPicked({ item: x, kind: "food" }) }))), !loading && q.trim().length >= 2 && !mine.length && !off.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Sin resultados. Cr\xE9alo desde \u201CR\xE1pido\u201D.")), tab === "recetas" && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, !recipesByCat.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Todav\xEDa no hay recetas guardadas."), recipesByCat.map((r) => /* @__PURE__ */ import_react7.default.createElement(
+    ), loading && /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), mine.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.id, food: f, onPick: (x) => setPicked({ item: x, kind: "food" }) }))), superm.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Mercadona y Consum"), superm.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(
+      FoodRow,
+      {
+        key: f.barcode || i,
+        food: f,
+        badge: f.ui_store,
+        onPick: (x) => setPicked({ item: x, kind: "food" })
+      }
+    ))), off.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.barcode || i, food: f, badge: "nuevo", onPick: (x) => setPicked({ item: x, kind: "food" }) }))), !loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Sin resultados. Cr\xE9alo desde \u201CR\xE1pido\u201D.")), tab === "recetas" && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, !recipesByCat.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Todav\xEDa no hay recetas guardadas."), recipesByCat.map((r) => /* @__PURE__ */ import_react7.default.createElement(
       "button",
       {
         key: r.id,
@@ -2703,7 +2906,7 @@ react-dom/cjs/react-dom.production.min.js:
     )));
   }
   function stripUi(f) {
-    const { nutriscore, nova, ...rest } = f;
+    const { nutriscore, nova, ui_store, ...rest } = f;
     return rest;
   }
 
@@ -3021,7 +3224,7 @@ react-dom/cjs/react-dom.production.min.js:
           setAviso(`Ojo: "${yaEsta.name}" ya est\xE1 en la despensa con este c\xF3digo.`);
           return;
         }
-        const found = await lookupBarcode(c);
+        const found = await findCatalogByBarcode(c).catch(() => null) || await lookupBarcode(c).catch(() => null);
         if (!found) return;
         setF((p) => {
           const nuevo = { ...p };
@@ -3032,7 +3235,7 @@ react-dom/cjs/react-dom.production.min.js:
           }
           return nuevo;
         });
-        setAviso(`Encontrado en Open Food Facts: ${found.name}. Repasa los valores.`);
+        setAviso(`Encontrado: ${found.name}. Repasa los valores.`);
       } catch {
       }
     }, []);
@@ -3247,9 +3450,9 @@ react-dom/cjs/react-dom.production.min.js:
           setBusy(false);
           return;
         }
-        const found = await lookupBarcode(code);
+        const found = await findCatalogByBarcode(code).catch(() => null) || await lookupBarcode(code).catch(() => null);
         if (found) {
-          const { nutriscore, nova, ...limpio } = found;
+          const { nutriscore, nova, ui_store, ...limpio } = found;
           const saved = await saveFood(limpio);
           toast(`A\xF1adido: ${saved.name}`);
           onSaved(saved);
@@ -3285,7 +3488,7 @@ react-dom/cjs/react-dom.production.min.js:
             onSaved(food);
           }
         }
-      ) : /* @__PURE__ */ import_react11.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react11.default.createElement("p", { className: "tiny dim", style: { margin: 0 } }, "Apunta con la c\xE1mara al c\xF3digo de barras del producto. Si est\xE1 en Open Food Facts se guarda solo con todos sus valores; si no, te dejo rellenar la etiqueta a mano."), /* @__PURE__ */ import_react11.default.createElement(import_react11.Suspense, { fallback: /* @__PURE__ */ import_react11.default.createElement("div", { className: "empty tiny blink" }, "abriendo la c\xE1mara\u2026") }, /* @__PURE__ */ import_react11.default.createElement(BarcodeScanner4, { key: scanKey, onDetected })), msg && /* @__PURE__ */ import_react11.default.createElement("p", { className: "tiny", style: { color: "var(--kaki)", margin: 0 } }, msg), /* @__PURE__ */ import_react11.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react11.default.createElement("button", { className: "btn grow", onClick: () => {
+      ) : /* @__PURE__ */ import_react11.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react11.default.createElement("p", { className: "tiny dim", style: { margin: 0 } }, "Apunta con la c\xE1mara al c\xF3digo de barras del producto. Si lo tenemos en el cat\xE1logo de Mercadona y Consum o en Open Food Facts, se guarda solo con todos sus valores; si no, te dejo rellenar la etiqueta a mano."), /* @__PURE__ */ import_react11.default.createElement(import_react11.Suspense, { fallback: /* @__PURE__ */ import_react11.default.createElement("div", { className: "empty tiny blink" }, "abriendo la c\xE1mara\u2026") }, /* @__PURE__ */ import_react11.default.createElement(BarcodeScanner4, { key: scanKey, onDetected })), msg && /* @__PURE__ */ import_react11.default.createElement("p", { className: "tiny", style: { color: "var(--kaki)", margin: 0 } }, msg), /* @__PURE__ */ import_react11.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react11.default.createElement("button", { className: "btn grow", onClick: () => {
         setScanKey((k) => k + 1);
         setMsg("");
       } }, "Volver a escanear"), /* @__PURE__ */ import_react11.default.createElement("button", { className: "btn grow", onClick: () => {
@@ -3429,6 +3632,7 @@ react-dom/cjs/react-dom.production.min.js:
     const [grams, setGrams] = (0, import_react12.useState)(100);
     const [q, setQ] = (0, import_react12.useState)("");
     const [mine, setMine] = (0, import_react12.useState)([]);
+    const [superm, setSuperm] = (0, import_react12.useState)([]);
     const [off, setOff] = (0, import_react12.useState)([]);
     const [loading, setLoading] = (0, import_react12.useState)(false);
     const [cam, setCam] = (0, import_react12.useState)(false);
@@ -3445,6 +3649,7 @@ react-dom/cjs/react-dom.production.min.js:
       const term = q.trim();
       if (term.length < 2) {
         setOff([]);
+        setSuperm([]);
         recentFoods(8).then(setMine).catch(() => {
         });
         return;
@@ -3453,12 +3658,16 @@ react-dom/cjs/react-dom.production.min.js:
       setLoading(true);
       const t = setTimeout(async () => {
         try {
-          const [local, remote] = await Promise.all([
+          const [local, cat, remote] = await Promise.all([
             searchFoods(term, 10).catch(() => []),
+            searchCatalog(term, 12).catch(() => []),
             searchOFF(term, { signal: ctrl.signal }).catch(() => [])
           ]);
           setMine(local);
           const codes = new Set(local.map((f) => f.barcode).filter(Boolean));
+          const delSuper = cat.filter((r) => !codes.has(r.barcode));
+          delSuper.forEach((r) => codes.add(r.barcode));
+          setSuperm(delSuper);
           setOff(remote.filter((r) => !codes.has(r.barcode)));
         } finally {
           setLoading(false);
@@ -3486,7 +3695,12 @@ react-dom/cjs/react-dom.production.min.js:
           choose(local);
           return;
         }
-        const found = await lookupBarcode(code);
+        const enSuper = await findCatalogByBarcode(code).catch(() => null);
+        if (enSuper) {
+          choose(enSuper);
+          return;
+        }
+        const found = await lookupBarcode(code).catch(() => null);
         if (found) {
           choose(found);
           return;
@@ -3568,7 +3782,7 @@ react-dom/cjs/react-dom.production.min.js:
       setScanKey((k) => k + 1);
       setScanMsg("");
       setSuelto("");
-    } }, "Volver a escanear"), suelto && /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-sm btn-primary grow", onClick: () => setCrear(suelto) }, "\u270E Crearlo"))), loading && /* @__PURE__ */ import_react12.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), /* @__PURE__ */ import_react12.default.createElement("div", { style: { maxHeight: "42vh", overflowY: "auto" } }, mine.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react12.default.createElement(IngredientRow, { key: f.id, f, onPick: choose }))), off.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react12.default.createElement(IngredientRow, { key: f.barcode || i, f, badge: "nuevo", onPick: choose })))), !loading && q.trim().length >= 2 && !mine.length && !off.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "empty tiny" }, "Sin resultados.", /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-sm btn-block", style: { marginTop: 8 }, onClick: () => setCrear("") }, "\u270E Crearlo a mano")));
+    } }, "Volver a escanear"), suelto && /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-sm btn-primary grow", onClick: () => setCrear(suelto) }, "\u270E Crearlo"))), loading && /* @__PURE__ */ import_react12.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), /* @__PURE__ */ import_react12.default.createElement("div", { style: { maxHeight: "42vh", overflowY: "auto" } }, mine.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react12.default.createElement(IngredientRow, { key: f.id, f, onPick: choose }))), superm.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "eyebrow" }, "Mercadona y Consum"), superm.map((f, i) => /* @__PURE__ */ import_react12.default.createElement(IngredientRow, { key: f.barcode || i, f, badge: f.ui_store, onPick: choose }))), off.length > 0 && /* @__PURE__ */ import_react12.default.createElement(import_react12.default.Fragment, null, /* @__PURE__ */ import_react12.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react12.default.createElement(IngredientRow, { key: f.barcode || i, f, badge: "nuevo", onPick: choose })))), !loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && /* @__PURE__ */ import_react12.default.createElement("div", { className: "empty tiny" }, "Sin resultados.", /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-sm btn-block", style: { marginTop: 8 }, onClick: () => setCrear("") }, "\u270E Crearlo a mano")));
   }
   function RecipeEditor({ open, initial, onClose, onSaved, toast, profiles = [] }) {
     const [r, setR] = (0, import_react12.useState)(EMPTY);

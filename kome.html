@@ -1024,12 +1024,15 @@ react-dom/cjs/react-dom.production.min.js:
           qrRef.current = scanner;
           setModo("libreria");
           await scanner.start(
-            CAMARA,
+            // el primer argumento solo admite una clave; las condiciones de
+            // verdad (resolución y enfoque) van en videoConstraints
+            { facingMode: "environment" },
             {
               fps: 12,
               // un recuadro grande: cuanto más ancho, más píxeles por barra
               qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(h * 0.55) }),
-              disableFlip: true
+              disableFlip: true,
+              videoConstraints: CAMARA
             },
             (texto) => cantar(texto),
             () => {
@@ -1039,7 +1042,10 @@ react-dom/cjs/react-dom.production.min.js:
         } catch (e) {
           if (cancelado) return;
           setModo("manual");
-          setEstado("No se pudo abrir la c\xE1mara. Escribe el c\xF3digo o hazle una foto.");
+          const porque = String((e == null ? void 0 : e.message) || e || "").slice(0, 90);
+          setEstado(
+            "No se pudo abrir la c\xE1mara" + (porque ? ` (${porque})` : "") + ". Hazle una foto al c\xF3digo o escr\xEDbelo."
+          );
           onError == null ? void 0 : onError(e);
         }
       })();

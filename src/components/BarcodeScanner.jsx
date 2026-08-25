@@ -128,12 +128,15 @@ export default function BarcodeScanner({ onDetected, onError }) {
         qrRef.current = scanner;
         setModo("libreria");
         await scanner.start(
-          CAMARA,
+          // el primer argumento solo admite una clave; las condiciones de
+          // verdad (resolución y enfoque) van en videoConstraints
+          { facingMode: "environment" },
           {
             fps: 12,
             // un recuadro grande: cuanto más ancho, más píxeles por barra
             qrbox: (w, h) => ({ width: Math.floor(w * 0.92), height: Math.floor(h * 0.55) }),
             disableFlip: true,
+            videoConstraints: CAMARA,
           },
           (texto) => cantar(texto),
           () => {}
@@ -142,7 +145,11 @@ export default function BarcodeScanner({ onDetected, onError }) {
       } catch (e) {
         if (cancelado) return;
         setModo("manual");
-        setEstado("No se pudo abrir la cámara. Escribe el código o hazle una foto.");
+        const porque = String(e?.message || e || "").slice(0, 90);
+        setEstado(
+          "No se pudo abrir la cámara" + (porque ? ` (${porque})` : "") +
+          ". Hazle una foto al código o escríbelo."
+        );
         onError?.(e);
       }
     })();

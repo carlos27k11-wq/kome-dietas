@@ -30,7 +30,7 @@ export default function BarcodeScanner({ onDetected, onError }) {
   const done = useRef(false);
   const vivo = useRef(true);
 
-  const [camara, setCamara] = useState(false);
+  const [medios, setMedios] = useState(null);   // el vídeo en marcha
   const [estado, setEstado] = useState("Pidiendo acceso a la cámara…");
   const [aMano, setAMano] = useState("");
   const [manual, setManual] = useState(false);
@@ -81,11 +81,10 @@ export default function BarcodeScanner({ onDetected, onError }) {
       if (cancelado) { stream.getTracks().forEach((t) => t.stop()); return; }
 
       streamRef.current = stream;
-      setCamara(true);
+      // el <video> todavía no existe: se pinta con este cambio de estado y
+      // el efecto de abajo es el que le engancha la imagen
+      setMedios(stream);
       setEstado("Enfoca el código dentro de la franja");
-
-      const v = videoRef.current;
-      if (v) { v.srcObject = stream; await v.play().catch(() => {}); }
 
       // zoom, si la cámara lo permite: acercar ayuda más que nada
       const track = stream.getVideoTracks()[0];
@@ -133,6 +132,17 @@ export default function BarcodeScanner({ onDetected, onError }) {
     return () => { cancelado = true; clearTimeout(temporizador); soltar(); };
   }, [cantar, insegura, onError, soltar]);
 
+  /* la imagen se engancha cuando el <video> ya está pintado */
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !medios) return;
+    v.srcObject = medios;
+    const arrancar = () => v.play().catch(() => {});
+    arrancar();
+    v.addEventListener("loadedmetadata", arrancar);
+    return () => v.removeEventListener("loadedmetadata", arrancar);
+  }, [medios]);
+
   const cambiarZoom = useCallback((valor) => {
     setZoom((z) => (z ? { ...z, valor } : z));
     const track = streamRef.current?.getVideoTracks?.()[0];
@@ -156,7 +166,7 @@ export default function BarcodeScanner({ onDetected, onError }) {
 
   return (
     <div>
-      {camara && (
+      {medios && (
         <div style={{ position: "relative", background: "#000", lineHeight: 0 }}>
           <video ref={videoRef} playsInline muted autoPlay
             style={{ width: "100%", display: "block", maxHeight: "44vh", objectFit: "cover" }} />

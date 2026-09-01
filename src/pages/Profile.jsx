@@ -168,6 +168,9 @@ export default function ProfilePage({ profile, onUpdate, onPreviewTheme, onSwitc
             <input className="input num" type="number" step="0.1" inputMode="decimal" value={f.weight_kg || ""} onChange={(e) => set("weight_kg", e.target.value)} />
           </div>
         </div>
+        <p className="tiny dim" style={{ margin: "6px 0 0" }}>
+          Si te pesas en la app del gimnasio, el peso se trae solo de allí cada vez que entras.
+        </p>
         <div className="field" style={{ marginTop: 10 }}>
           <label>Actividad diaria</label>
           <select className="input" value={f.activity_level || "ligero"} onChange={(e) => set("activity_level", e.target.value)}>

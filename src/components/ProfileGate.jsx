@@ -92,7 +92,7 @@ export default function ProfileGate({ profiles, onPick, onCreated }) {
           </div>
           <div className="field">
             <label>Nombre</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Marta" autoFocus />
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Marta" />
           </div>
           <div className="field">
             <label>Icono</label>

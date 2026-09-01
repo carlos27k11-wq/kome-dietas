@@ -7,7 +7,8 @@ import Plan from "./pages/Plan";
 import ProfilePage from "./pages/Profile";
 import { Toast } from "./components/ui";
 import { ThemeProvider, applyTheme, readStoredTheme, storeTheme, normalizeTheme } from "./components/theme";
-import { listProfiles, listRecipes } from "./lib/store";
+import { listProfiles, listRecipes, updateProfile } from "./lib/store";
+import { ultimoPesoDelGimnasio } from "./lib/gym";
 
 const TABS = [
   { key: "hoy", label: "Hoy", jp: "今日" },
@@ -41,6 +42,24 @@ export default function App() {
     setMsg(text);
     setTimeout(() => setMsg(""), 2200);
   }, []);
+
+  /* El peso lo lleva la app del gimnasio: si allí hay uno más reciente
+     se trae, que de él dependen el metabolismo basal y los objetivos. */
+  useEffect(() => {
+    if (!profile?.name) return;
+    let vivo = true;
+    ultimoPesoDelGimnasio(profile.name)
+      .then(async (kg) => {
+        if (!vivo || !kg) return;
+        if (Math.abs(kg - Number(profile.weight_kg || 0)) < 0.05) return;
+        const nuevo = await updateProfile(profile.id, { weight_kg: kg });
+        if (!vivo) return;
+        setProfile(nuevo);
+        setProfiles((ps) => ps.map((x) => (x.id === nuevo.id ? nuevo : x)));
+      })
+      .catch(() => { /* sin gimnasio, kome se queda con lo suyo */ });
+    return () => { vivo = false; };
+  }, [profile?.id, profile?.name, profile?.weight_kg]);
 
   const loadRecipes = useCallback(() => {
     listRecipes().then(setRecipes).catch(() => {});

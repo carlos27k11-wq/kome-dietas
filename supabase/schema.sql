@@ -270,3 +270,21 @@ create index if not exists catalog_foods_store_idx on public.catalog_foods (stor
 --     for all using (true) with check (true);
 --   ... node scripts/subir-catalogo.mjs ...
 --   drop policy "catalogo carga temporal" on public.catalog_foods;
+
+-- ============================================================
+-- Hábitos del día: cosas que solo se marcan, sin cantidad.
+-- Ahora mismo solo la creatina, y solo en el perfil de Carlos.
+-- ============================================================
+create table if not exists public.habit_logs (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  date date not null default current_date,
+  habit text not null,
+  done boolean not null default true,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists habit_profile_date_key
+  on public.habit_logs (profile_id, date, habit);
+alter table public.habit_logs enable row level security;
+create policy "acceso_familia" on public.habit_logs
+  for all to anon, authenticated using (true) with check (true);

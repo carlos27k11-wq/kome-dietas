@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { WindowScene, RiceBowl, dayPhase } from "../components/PixelArt";
-import { Sheet, PixelBar, MacroBar, Insight } from "../components/ui";
+import { Sheet, PixelBar, MacroBar, Insight, NumberInput, PixelCheck } from "../components/ui";
 import { useTheme } from "../components/theme";
 import AddSheet from "../components/AddSheet";
 import {
@@ -10,6 +10,7 @@ import {
 import {
   getDay, addEntries, updateEntry, deleteEntry, copyDay,
   getWater, addWater, resetWater, setWaterTotal, getSteps, setSteps,
+  getHabit, setHabit,
 } from "../lib/store";
 
 /* --- vaso de agua --- */
@@ -59,7 +60,7 @@ function TotalEditor({ label, unit, value, step = 1, onSave, onCancel }) {
         <div className="row">
           <input
             className="input num grow" type="number" inputMode="numeric" min="0" step={step}
-            value={draft} onChange={(e) => setDraft(e.target.value)} autoFocus
+            value={draft} onChange={(e) => setDraft(e.target.value)}
           />
           <span className="dim num">{unit}</span>
         </div>
@@ -88,9 +89,8 @@ function EntryEditor({ entry, onClose, onSave, onDelete }) {
         {scalable ? (
           <div className="field">
             <label>{isRecipe ? "Raciones" : "Gramos"}</label>
-            <input className="input num" type="number" inputMode="decimal" min="0"
-              step={isRecipe ? 0.25 : 5} value={amount}
-              onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} />
+            <NumberInput className="input num" value={amount}
+              onChange={(v) => setAmount(Math.max(0, v))} />
           </div>
         ) : (
           <p className="tiny dim">Esta entrada se apuntó a mano, así que no se puede escalar. Bórrala y créala de nuevo si quieres cambiarla.</p>
@@ -139,6 +139,10 @@ export default function Today({ profile, recipes, toast }) {
   const [showMicros, setShowMicros] = useState(false);
   const [editWater, setEditWater] = useState(false);
   const [editSteps, setEditSteps] = useState(false);
+  const [creatina, setCreatina] = useState(false);
+
+  // la creatina es cosa de Carlos: al resto ni se le enseña
+  const tomaCreatina = (profile.name || "").trim().toLowerCase() === "carlos";
 
   const targets = useMemo(() => targetsFor(profile), [profile]);
   const totals = useMemo(() => sumEntries(entries), [entries]);
@@ -148,13 +152,14 @@ export default function Today({ profile, recipes, toast }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [e, w, st] = await Promise.all([
+      const [e, w, st, cr] = await Promise.all([
         getDay(profile.id, date), getWater(profile.id, date), getSteps(profile.id, date),
+        tomaCreatina ? getHabit(profile.id, date, "creatina").catch(() => false) : false,
       ]);
-      setEntries(e); setWater(w); setStepsState(st);
+      setEntries(e); setWater(w); setStepsState(st); setCreatina(cr);
     } catch (err) { toast("No se pudo cargar el día"); }
     finally { setLoading(false); }
-  }, [profile.id, date, toast]);
+  }, [profile.id, date, toast, tomaCreatina]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setEditWater(false); setEditSteps(false); }, [date]);
@@ -321,6 +326,35 @@ export default function Today({ profile, recipes, toast }) {
           Las kcal andando no se suman a lo que puedes comer: tu factor de actividad ya las incluye.
         </p>
       </div>
+
+      {/* --- creatina --- */}
+      {tomaCreatina && (
+        <button
+          className="px"
+          onClick={async () => {
+            const nuevo = !creatina;
+            setCreatina(nuevo);
+            try {
+              await setHabit(profile.id, date, "creatina", nuevo);
+              if (nuevo && navigator.vibrate) navigator.vibrate(20);
+            } catch { setCreatina(!nuevo); toast("No se pudo guardar"); }
+          }}
+          style={{
+            display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+            padding: 12, cursor: "pointer", color: "inherit",
+          }}
+          aria-pressed={creatina}
+        >
+          <PixelCheck on={creatina} size={30} />
+          <div className="grow">
+            <div className="eyebrow">Creatina {jp("習慣")}</div>
+            <div style={{ fontSize: claro ? 17 : 15 }}>
+              {creatina ? "Tomada" : "Todavía no"}
+            </div>
+          </div>
+          <span className="tiny dim">{creatina ? "✓" : "toca para marcar"}</span>
+        </button>
+      )}
 
       {/* --- lectura del día --- */}
       {insights.length > 0 && (

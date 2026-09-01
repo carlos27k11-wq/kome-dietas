@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { Sheet } from "./ui";
+import { Sheet, NumberInput } from "./ui";
 import { useTheme } from "./theme";
 
 // el lector de códigos pesa; se carga solo cuando hace falta
@@ -95,11 +95,10 @@ function PortionEditor({ item, kind, meal, onCancel, onConfirm }) {
       <div className="field">
         <label>{isRecipe ? "Raciones" : "Cantidad en gramos"}</label>
         <div className="row">
-          <input
-            className="input num grow" type="number" inputMode="decimal" min="0"
-            step={isRecipe ? 0.25 : 5}
+          <NumberInput
+            className="input num grow"
             value={amount}
-            onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))}
+            onChange={(v) => setAmount(Math.max(0, v))}
           />
           <span className="dim num">{isRecipe ? "rac." : "g"}</span>
         </div>
@@ -253,6 +252,18 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
     return () => { clearTimeout(t); ctrl.abort(); };
   }, [q, tab, open]);
 
+  /* Al elegir un alimento se guarda ya en la despensa, sin esperar a
+     confirmar la ración: así lo que escaneas en Hoy aparece también en
+     la biblioteca de ingredientes del recetario. */
+  const elegirAlimento = useCallback(async (food) => {
+    setPicked({ item: food, kind: "food" });
+    if (food.id) return;
+    try {
+      const guardado = await saveFood(stripUi(food));
+      setPicked((p) => (p?.item === food ? { item: guardado, kind: "food" } : p));
+    } catch { /* si falla, se intenta otra vez al confirmar */ }
+  }, []);
+
   const addFood = useCallback(
     async ({ amount, meal: mealKey, macros }) => {
       let food = picked.item;
@@ -284,16 +295,16 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
     setScanMsg("Buscando " + code + "…");
     try {
       const local = await findFoodByBarcode(code);
-      if (local) { setPicked({ item: local, kind: "food" }); return; }
+      if (local) { elegirAlimento(local); return; }
       const enSuper = await findCatalogByBarcode(code).catch(() => null);
-      if (enSuper) { setPicked({ item: enSuper, kind: "food" }); return; }
+      if (enSuper) { elegirAlimento(enSuper); return; }
       const found = await lookupBarcode(code).catch(() => null);
-      if (found) setPicked({ item: found, kind: "food" });
+      if (found) elegirAlimento(found);
       else setScanMsg(`El código ${code} no está en ninguna base. Añádelo con "Rápido" o créalo en Ingredientes.`);
     } catch {
       setScanMsg("Fallo al consultar el código. Prueba otra vez.");
     }
-  }, []);
+  }, [elegirAlimento]);
 
   const recipesByCat = useMemo(() => recipes, [recipes]);
 
@@ -320,7 +331,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
           {tab === "buscar" && (
             <>
               <input
-                className="input" autoFocus value={q} onChange={(e) => setQ(e.target.value)}
+                className="input" value={q} onChange={(e) => setQ(e.target.value)}
                 placeholder="Yogur griego, arroz, pechuga…"
               />
               {loading && <div className="tiny dim center blink">buscando…</div>}
@@ -328,7 +339,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
               {mine.length > 0 && (
                 <>
                   <div className="eyebrow">{q.trim().length < 2 ? "Lo que más usáis" : "En vuestra despensa"}</div>
-                  {mine.map((f) => <FoodRow key={f.id} food={f} onPick={(x) => setPicked({ item: x, kind: "food" })} />)}
+                  {mine.map((f) => <FoodRow key={f.id} food={f} onPick={elegirAlimento} />)}
                 </>
               )}
 
@@ -336,8 +347,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
                 <>
                   <div className="eyebrow">Mercadona y Consum</div>
                   {superm.map((f, i) => (
-                    <FoodRow key={f.barcode || i} food={f} badge={f.ui_store}
-                      onPick={(x) => setPicked({ item: x, kind: "food" })} />
+                    <FoodRow key={f.barcode || i} food={f} badge={f.ui_store} onPick={elegirAlimento} />
                   ))}
                 </>
               )}
@@ -346,7 +356,7 @@ export default function AddSheet({ open, onClose, meal = "comida", recipes = [],
                 <>
                   <div className="eyebrow">Open Food Facts</div>
                   {off.map((f, i) => (
-                    <FoodRow key={f.barcode || i} food={f} badge="nuevo" onPick={(x) => setPicked({ item: x, kind: "food" })} />
+                    <FoodRow key={f.barcode || i} food={f} badge="nuevo" onPick={elegirAlimento} />
                   ))}
                 </>
               )}

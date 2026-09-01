@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Sheet, FullScreen } from "../components/ui";
+import { Sheet, FullScreen, PixelCheck } from "../components/ui";
 import { useTheme, Jp } from "../components/theme";
 import {
   getPlan, addPlanItem, deletePlanItem, copyWeek, addEntries,
   listShopping, addShoppingItem, toggleShoppingItem, deleteShoppingItem,
-  clearDoneShopping,
+  clearDoneShopping, clearAllShopping,
 } from "../lib/store";
 import { isoDate, shiftDate, mondayOf, WEEKDAYS, WEEKDAYS_JP } from "../lib/nutrition";
 
@@ -79,25 +79,6 @@ function PickDish({ open, onClose, recipes, profiles, slot, onPick }) {
 }
 
 /* --- casilla de verificación --- */
-function PixelCheck({ on }) {
-  return (
-    <svg viewBox="0 0 12 12" width="26" height="26" shapeRendering="crispEdges" aria-hidden="true">
-      <rect x="0" y="0" width="12" height="12" fill={on ? "var(--matcha)" : "var(--night)"} />
-      <g fill="var(--line)">
-        <rect x="0" y="0" width="12" height="1" /><rect x="0" y="11" width="12" height="1" />
-        <rect x="0" y="0" width="1" height="12" /><rect x="11" y="0" width="1" height="12" />
-      </g>
-      {on && (
-        <g fill="var(--night)">
-          <rect x="2" y="6" width="2" height="2" />
-          <rect x="4" y="8" width="2" height="2" />
-          <rect x="6" y="6" width="2" height="2" />
-          <rect x="8" y="4" width="2" height="2" />
-        </g>
-      )}
-    </svg>
-  );
-}
 
 /* ============================================================
    Lista de la compra de la casa. Ocupa toda la pantalla y solo
@@ -207,6 +188,21 @@ function ShoppingList({ open, onClose, profileId, toast }) {
             <div style={{ fontSize: 30 }}>🧺</div>
             <p className="tiny">La lista está vacía. Ve apuntando lo que falte en casa.</p>
           </div>
+        )}
+
+        {items.length > 0 && (
+          <button
+            className="btn btn-ghost btn-block btn-sm"
+            onClick={async () => {
+              if (!confirm(`¿Borrar la lista entera? Se van las ${items.length} cosas, compradas y por comprar.`)) return;
+              setItems([]);
+              try { await clearAllShopping(); toast("Lista borrada"); }
+              catch { toast("No se pudo borrar"); }
+              load();
+            }}
+          >
+            🗑 Borrar la lista entera
+          </button>
         )}
 
         {pending.length > 0 && (

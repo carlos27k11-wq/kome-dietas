@@ -783,6 +783,40 @@ react-dom/cjs/react-dom.production.min.js:
   });
 
   // src/components/ui.jsx
+  function PixelCheck({ on, size = 26 }) {
+    return /* @__PURE__ */ import_react.default.createElement("svg", { viewBox: "0 0 12 12", width: size, height: size, shapeRendering: "crispEdges", "aria-hidden": "true" }, /* @__PURE__ */ import_react.default.createElement("rect", { x: "0", y: "0", width: "12", height: "12", fill: on ? "var(--matcha)" : "var(--night)" }), /* @__PURE__ */ import_react.default.createElement("g", { fill: "var(--line)" }, /* @__PURE__ */ import_react.default.createElement("rect", { x: "0", y: "0", width: "12", height: "1" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "0", y: "11", width: "12", height: "1" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "0", y: "0", width: "1", height: "12" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "11", y: "0", width: "1", height: "12" })), on && /* @__PURE__ */ import_react.default.createElement("g", { fill: "var(--night)" }, /* @__PURE__ */ import_react.default.createElement("rect", { x: "2", y: "6", width: "2", height: "2" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "4", y: "8", width: "2", height: "2" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "6", y: "6", width: "2", height: "2" }), /* @__PURE__ */ import_react.default.createElement("rect", { x: "8", y: "4", width: "2", height: "2" })));
+  }
+  function NumberInput({ value, onChange, className = "input num", ...props }) {
+    const [txt, setTxt] = (0, import_react.useState)(() => value == null || value === "" ? "" : String(value));
+    const mio = (0, import_react.useRef)(value);
+    (0, import_react.useEffect)(() => {
+      if (value !== mio.current) {
+        mio.current = value;
+        setTxt(value == null ? "" : String(value));
+      }
+    }, [value]);
+    return /* @__PURE__ */ import_react.default.createElement(
+      "input",
+      {
+        className,
+        inputMode: "decimal",
+        value: txt,
+        onChange: (e) => {
+          let t = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+          t = t.replace(/^0+(?=\d)/, "");
+          const punto = t.indexOf(".");
+          if (punto >= 0) t = t.slice(0, punto + 1) + t.slice(punto + 1).replace(/\./g, "");
+          setTxt(t);
+          const n = t === "" || t === "." ? 0 : Number(t);
+          if (isFinite(n)) {
+            mio.current = n;
+            onChange(n);
+          }
+        },
+        ...props
+      }
+    );
+  }
   function Sheet({ open, onClose, title, jp, children, footer }) {
     const ref = (0, import_react.useRef)(null);
     (0, import_react.useEffect)(() => {
@@ -2331,6 +2365,16 @@ react-dom/cjs/react-dom.production.min.js:
     if (error) throw error;
     return value;
   }
+  async function getHabit(profileId, date, habit) {
+    const { data, error } = await supabase.from("habit_logs").select("done").eq("profile_id", profileId).eq("date", date).eq("habit", habit).maybeSingle();
+    if (error) throw error;
+    return !!(data == null ? void 0 : data.done);
+  }
+  async function setHabit(profileId, date, habit, done) {
+    const { error } = await supabase.from("habit_logs").upsert({ profile_id: profileId, date, habit, done }, { onConflict: "profile_id,date,habit" });
+    if (error) throw error;
+    return done;
+  }
   async function seriesFromView(view, field, profileId, days, endDate) {
     const start = shiftDate(endDate, -(days - 1));
     const { data, error } = await supabase.from(view).select("*").eq("profile_id", profileId).gte("date", start).lte("date", endDate);
@@ -2410,6 +2454,10 @@ react-dom/cjs/react-dom.production.min.js:
     const { error } = await supabase.from("shopping_items").delete().eq("done", true);
     if (error) throw error;
   }
+  async function clearAllShopping() {
+    const { error } = await supabase.from("shopping_items").delete().not("id", "is", null);
+    if (error) throw error;
+  }
 
   // src/components/ProfileGate.jsx
   function Lanterns() {
@@ -2447,7 +2495,7 @@ react-dom/cjs/react-dom.production.min.js:
         setBusy(false);
       }
     }
-    return /* @__PURE__ */ import_react4.default.createElement("div", { className: "gate" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "center" }, !claro && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement(Lanterns, null), /* @__PURE__ */ import_react4.default.createElement("div", { className: "kanji", style: { marginTop: 6 } }, "\u4ECA\u65E5\u306F\u8AB0\u304C\u98DF\u3079\u308B")), /* @__PURE__ */ import_react4.default.createElement("h1", { style: { fontSize: claro ? 30 : 26, marginTop: 6 } }, "\xBFQui\xE9n come hoy?")), /* @__PURE__ */ import_react4.default.createElement("div", { className: "gate-grid" }, profiles.map((p) => /* @__PURE__ */ import_react4.default.createElement("button", { key: p.id, className: "gate-card", onClick: () => onPick(p) }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar drop", style: { borderColor: p.color, background: "var(--panel)" } }, /* @__PURE__ */ import_react4.default.createElement("span", { style: { filter: "saturate(1.1)" } }, p.avatar_emoji)), /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontFamily: "var(--font-display)", fontSize: claro ? 18 : 15, fontWeight: claro ? 600 : 400 } }, p.name))), /* @__PURE__ */ import_react4.default.createElement("button", { className: "gate-card", onClick: () => setOpen(true) }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar", style: { borderStyle: "dashed", fontSize: 30, color: "var(--muted-2)" } }, "\uFF0B"), /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontFamily: "var(--font-display)", fontSize: 15 } }, "Nuevo"))), /* @__PURE__ */ import_react4.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", maxWidth: 340, textAlign: "center" } }, "Cada perfil lleva su propio diario, sus objetivos y su peso. Las recetas son de toda la casa."), /* @__PURE__ */ import_react4.default.createElement(Sheet, { open, onClose: () => setOpen(false), title: "Nuevo perfil", jp: "\u65B0\u898F" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "row", style: { justifyContent: "center" } }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar", style: { borderColor: color } }, emoji)), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Nombre"), /* @__PURE__ */ import_react4.default.createElement("input", { className: "input", value: name, onChange: (e) => setName(e.target.value), placeholder: "Marta", autoFocus: true })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Icono"), /* @__PURE__ */ import_react4.default.createElement(AvatarPicker, { value: emoji, onChange: setEmoji })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Color"), /* @__PURE__ */ import_react4.default.createElement("div", { className: "row", style: { flexWrap: "wrap", gap: 8 } }, AVATAR_COLORS.map((c) => /* @__PURE__ */ import_react4.default.createElement(
+    return /* @__PURE__ */ import_react4.default.createElement("div", { className: "gate" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "center" }, !claro && /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement(Lanterns, null), /* @__PURE__ */ import_react4.default.createElement("div", { className: "kanji", style: { marginTop: 6 } }, "\u4ECA\u65E5\u306F\u8AB0\u304C\u98DF\u3079\u308B")), /* @__PURE__ */ import_react4.default.createElement("h1", { style: { fontSize: claro ? 30 : 26, marginTop: 6 } }, "\xBFQui\xE9n come hoy?")), /* @__PURE__ */ import_react4.default.createElement("div", { className: "gate-grid" }, profiles.map((p) => /* @__PURE__ */ import_react4.default.createElement("button", { key: p.id, className: "gate-card", onClick: () => onPick(p) }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar drop", style: { borderColor: p.color, background: "var(--panel)" } }, /* @__PURE__ */ import_react4.default.createElement("span", { style: { filter: "saturate(1.1)" } }, p.avatar_emoji)), /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontFamily: "var(--font-display)", fontSize: claro ? 18 : 15, fontWeight: claro ? 600 : 400 } }, p.name))), /* @__PURE__ */ import_react4.default.createElement("button", { className: "gate-card", onClick: () => setOpen(true) }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar", style: { borderStyle: "dashed", fontSize: 30, color: "var(--muted-2)" } }, "\uFF0B"), /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontFamily: "var(--font-display)", fontSize: 15 } }, "Nuevo"))), /* @__PURE__ */ import_react4.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", maxWidth: 340, textAlign: "center" } }, "Cada perfil lleva su propio diario, sus objetivos y su peso. Las recetas son de toda la casa."), /* @__PURE__ */ import_react4.default.createElement(Sheet, { open, onClose: () => setOpen(false), title: "Nuevo perfil", jp: "\u65B0\u898F" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "row", style: { justifyContent: "center" } }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "avatar", style: { borderColor: color } }, emoji)), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Nombre"), /* @__PURE__ */ import_react4.default.createElement("input", { className: "input", value: name, onChange: (e) => setName(e.target.value), placeholder: "Marta" })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Icono"), /* @__PURE__ */ import_react4.default.createElement(AvatarPicker, { value: emoji, onChange: setEmoji })), /* @__PURE__ */ import_react4.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react4.default.createElement("label", null, "Color"), /* @__PURE__ */ import_react4.default.createElement("div", { className: "row", style: { flexWrap: "wrap", gap: 8 } }, AVATAR_COLORS.map((c) => /* @__PURE__ */ import_react4.default.createElement(
       "button",
       {
         key: c,
@@ -2726,15 +2774,11 @@ react-dom/cjs/react-dom.production.min.js:
       }
     }
     return /* @__PURE__ */ import_react7.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "px", style: { padding: 12 } }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "row", style: { gap: 10 } }, (item.image_url || item.photo_url) && /* @__PURE__ */ import_react7.default.createElement("img", { src: item.image_url || item.photo_url, alt: "", width: 52, height: 52, style: { objectFit: "cover" } }), /* @__PURE__ */ import_react7.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontFamily: "var(--font-display)" } }, item.name), /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim" }, isRecipe ? `${Math.round(item.kcal)} kcal por raci\xF3n` : `${Math.round(item.kcal_100)} kcal / 100 g`, item.brand ? ` \xB7 ${item.brand}` : "")))), /* @__PURE__ */ import_react7.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react7.default.createElement("label", null, isRecipe ? "Raciones" : "Cantidad en gramos"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react7.default.createElement(
-      "input",
+      NumberInput,
       {
         className: "input num grow",
-        type: "number",
-        inputMode: "decimal",
-        min: "0",
-        step: isRecipe ? 0.25 : 5,
         value: amount,
-        onChange: (e) => setAmount(Math.max(0, Number(e.target.value)))
+        onChange: (v) => setAmount(Math.max(0, v))
       }
     ), /* @__PURE__ */ import_react7.default.createElement("span", { className: "dim num" }, isRecipe ? "rac." : "g")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "chips", style: { marginTop: 6 } }, quick.map((q) => /* @__PURE__ */ import_react7.default.createElement("button", { key: q, className: "chip", "data-on": amount === q, onClick: () => setAmount(q) }, q, isRecipe ? " rac." : " g"))), !isRecipe && item.serving_name && /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim" }, "Raci\xF3n del envase: ", item.serving_name)), /* @__PURE__ */ import_react7.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react7.default.createElement("label", null, "Comida"), /* @__PURE__ */ import_react7.default.createElement("div", { className: "chips" }, MEALS.map((m) => /* @__PURE__ */ import_react7.default.createElement("button", { key: m.key, className: "chip", "data-on": mealKey === m.key, onClick: () => setMealKey(m.key) }, m.emoji, " ", m.label)))), /* @__PURE__ */ import_react7.default.createElement("div", { className: "px", style: { padding: 12 } }, /* @__PURE__ */ import_react7.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react7.default.createElement("span", { className: "eyebrow" }, "Aporta"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "num", style: { fontSize: 22 } }, Math.round(macros.kcal), " kcal")), /* @__PURE__ */ import_react7.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react7.default.createElement("div", { className: "row", style: { gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react7.default.createElement("span", { className: "num tiny", style: { color: "var(--sakura)" } }, "P ", macros.protein, " g"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "num tiny", style: { color: "var(--lantern)" } }, "C ", macros.carbs, " g"), /* @__PURE__ */ import_react7.default.createElement("span", { className: "num tiny", style: { color: "var(--mizu)" } }, "G ", macros.fat, " g"), macros.fiber > 0 && /* @__PURE__ */ import_react7.default.createElement("span", { className: "num tiny", style: { color: "var(--matcha)" } }, "F ", macros.fiber, " g")), check && /* @__PURE__ */ import_react7.default.createElement("p", { className: "tiny", style: { color: "var(--kaki)", marginBottom: 0 } }, "Ojo: los macros suman ", check.calc, " kcal pero la etiqueta declara ", check.dec, ". Dato posiblemente incompleto.")), /* @__PURE__ */ import_react7.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react7.default.createElement("button", { className: "btn btn-ghost", onClick: onCancel }, "Volver"), /* @__PURE__ */ import_react7.default.createElement("button", { className: "btn btn-primary grow", disabled: busy || amount <= 0, onClick: confirm2 }, busy ? "Guardando\u2026" : "A\xF1adir al diario")));
   }
@@ -2821,6 +2865,15 @@ react-dom/cjs/react-dom.production.min.js:
         ctrl.abort();
       };
     }, [q, tab, open]);
+    const elegirAlimento = (0, import_react7.useCallback)(async (food) => {
+      setPicked({ item: food, kind: "food" });
+      if (food.id) return;
+      try {
+        const guardado = await saveFood(stripUi(food));
+        setPicked((p) => (p == null ? void 0 : p.item) === food ? { item: guardado, kind: "food" } : p);
+      } catch {
+      }
+    }, []);
     const addFood = (0, import_react7.useCallback)(
       async ({ amount, meal: mealKey, macros }) => {
         let food = picked.item;
@@ -2862,21 +2915,21 @@ react-dom/cjs/react-dom.production.min.js:
       try {
         const local = await findFoodByBarcode(code);
         if (local) {
-          setPicked({ item: local, kind: "food" });
+          elegirAlimento(local);
           return;
         }
         const enSuper = await findCatalogByBarcode(code).catch(() => null);
         if (enSuper) {
-          setPicked({ item: enSuper, kind: "food" });
+          elegirAlimento(enSuper);
           return;
         }
         const found = await lookupBarcode(code).catch(() => null);
-        if (found) setPicked({ item: found, kind: "food" });
+        if (found) elegirAlimento(found);
         else setScanMsg(`El c\xF3digo ${code} no est\xE1 en ninguna base. A\xF1\xE1delo con "R\xE1pido" o cr\xE9alo en Ingredientes.`);
       } catch {
         setScanMsg("Fallo al consultar el c\xF3digo. Prueba otra vez.");
       }
-    }, []);
+    }, [elegirAlimento]);
     const recipesByCat = (0, import_react7.useMemo)(() => recipes, [recipes]);
     return /* @__PURE__ */ import_react7.default.createElement(Sheet, { open, onClose, title: picked ? "Ajusta la raci\xF3n" : "A\xF1adir al diario", jp: picked ? "\u91CF" : "\u8FFD\u52A0" }, picked ? /* @__PURE__ */ import_react7.default.createElement(
       PortionEditor,
@@ -2891,20 +2944,11 @@ react-dom/cjs/react-dom.production.min.js:
       "input",
       {
         className: "input",
-        autoFocus: true,
         value: q,
         onChange: (e) => setQ(e.target.value),
         placeholder: "Yogur griego, arroz, pechuga\u2026"
       }
-    ), loading && /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), mine.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.id, food: f, onPick: (x) => setPicked({ item: x, kind: "food" }) }))), superm.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Mercadona y Consum"), superm.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(
-      FoodRow,
-      {
-        key: f.barcode || i,
-        food: f,
-        badge: f.ui_store,
-        onPick: (x) => setPicked({ item: x, kind: "food" })
-      }
-    ))), off.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.barcode || i, food: f, badge: "nuevo", onPick: (x) => setPicked({ item: x, kind: "food" }) }))), !loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Sin resultados. Cr\xE9alo desde \u201CR\xE1pido\u201D.")), tab === "recetas" && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, !recipesByCat.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Todav\xEDa no hay recetas guardadas."), recipesByCat.map((r) => /* @__PURE__ */ import_react7.default.createElement(
+    ), loading && /* @__PURE__ */ import_react7.default.createElement("div", { className: "tiny dim center blink" }, "buscando\u2026"), mine.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, q.trim().length < 2 ? "Lo que m\xE1s us\xE1is" : "En vuestra despensa"), mine.map((f) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.id, food: f, onPick: elegirAlimento }))), superm.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Mercadona y Consum"), superm.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.barcode || i, food: f, badge: f.ui_store, onPick: elegirAlimento }))), off.length > 0 && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { className: "eyebrow" }, "Open Food Facts"), off.map((f, i) => /* @__PURE__ */ import_react7.default.createElement(FoodRow, { key: f.barcode || i, food: f, badge: "nuevo", onPick: elegirAlimento }))), !loading && q.trim().length >= 2 && !mine.length && !superm.length && !off.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Sin resultados. Cr\xE9alo desde \u201CR\xE1pido\u201D.")), tab === "recetas" && /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, !recipesByCat.length && /* @__PURE__ */ import_react7.default.createElement("div", { className: "empty tiny" }, "Todav\xEDa no hay recetas guardadas."), recipesByCat.map((r) => /* @__PURE__ */ import_react7.default.createElement(
       "button",
       {
         key: r.id,
@@ -2952,8 +2996,7 @@ react-dom/cjs/react-dom.production.min.js:
         min: "0",
         step,
         value: draft,
-        onChange: (e) => setDraft(e.target.value),
-        autoFocus: true
+        onChange: (e) => setDraft(e.target.value)
       }
     ), /* @__PURE__ */ import_react8.default.createElement("span", { className: "dim num" }, unit))), /* @__PURE__ */ import_react8.default.createElement("div", { className: "row", style: { marginTop: 8 } }, /* @__PURE__ */ import_react8.default.createElement("button", { className: "btn btn-ghost grow btn-sm", onClick: onCancel }, "Cancelar"), /* @__PURE__ */ import_react8.default.createElement("button", { className: "btn btn-primary grow btn-sm", disabled: !ok, onClick: () => onSave(n) }, "Guardar total")));
   }
@@ -2966,15 +3009,11 @@ react-dom/cjs/react-dom.production.min.js:
     const k = scalable ? amount / base : 1;
     const sc = (v) => +((Number(v) || 0) * k).toFixed(1);
     return /* @__PURE__ */ import_react8.default.createElement(Sheet, { open: true, onClose, title: entry.name, jp: "\u7DE8\u96C6" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "stack" }, scalable ? /* @__PURE__ */ import_react8.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react8.default.createElement("label", null, isRecipe ? "Raciones" : "Gramos"), /* @__PURE__ */ import_react8.default.createElement(
-      "input",
+      NumberInput,
       {
         className: "input num",
-        type: "number",
-        inputMode: "decimal",
-        min: "0",
-        step: isRecipe ? 0.25 : 5,
         value: amount,
-        onChange: (e) => setAmount(Math.max(0, Number(e.target.value)))
+        onChange: (v) => setAmount(Math.max(0, v))
       }
     )) : /* @__PURE__ */ import_react8.default.createElement("p", { className: "tiny dim" }, "Esta entrada se apunt\xF3 a mano, as\xED que no se puede escalar. B\xF3rrala y cr\xE9ala de nuevo si quieres cambiarla."), /* @__PURE__ */ import_react8.default.createElement("div", { className: "px", style: { padding: 12 } }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react8.default.createElement("span", { className: "eyebrow" }, "Aporta"), /* @__PURE__ */ import_react8.default.createElement("span", { className: "num", style: { fontSize: 20 } }, Math.round(sc(entry.kcal)), " kcal")), /* @__PURE__ */ import_react8.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react8.default.createElement("div", { className: "row", style: { gap: 14 } }, /* @__PURE__ */ import_react8.default.createElement("span", { className: "num tiny", style: { color: "var(--sakura)" } }, "P ", sc(entry.protein)), /* @__PURE__ */ import_react8.default.createElement("span", { className: "num tiny", style: { color: "var(--lantern)" } }, "C ", sc(entry.carbs)), /* @__PURE__ */ import_react8.default.createElement("span", { className: "num tiny", style: { color: "var(--mizu)" } }, "G ", sc(entry.fat)))), /* @__PURE__ */ import_react8.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react8.default.createElement("button", { className: "btn btn-ghost", onClick: () => onDelete(entry) }, "Borrar"), scalable && /* @__PURE__ */ import_react8.default.createElement(
       "button",
@@ -3007,6 +3046,8 @@ react-dom/cjs/react-dom.production.min.js:
     const [showMicros, setShowMicros] = (0, import_react8.useState)(false);
     const [editWater, setEditWater] = (0, import_react8.useState)(false);
     const [editSteps, setEditSteps] = (0, import_react8.useState)(false);
+    const [creatina, setCreatina] = (0, import_react8.useState)(false);
+    const tomaCreatina = (profile.name || "").trim().toLowerCase() === "carlos";
     const targets = (0, import_react8.useMemo)(() => targetsFor(profile), [profile]);
     const totals = (0, import_react8.useMemo)(() => sumEntries(entries), [entries]);
     const perMeal = (0, import_react8.useMemo)(() => mealTargets(profile, targets.kcal), [profile, targets.kcal]);
@@ -3014,20 +3055,22 @@ react-dom/cjs/react-dom.production.min.js:
     const load = (0, import_react8.useCallback)(async () => {
       setLoading(true);
       try {
-        const [e, w, st] = await Promise.all([
+        const [e, w, st, cr] = await Promise.all([
           getDay(profile.id, date),
           getWater(profile.id, date),
-          getSteps(profile.id, date)
+          getSteps(profile.id, date),
+          tomaCreatina ? getHabit(profile.id, date, "creatina").catch(() => false) : false
         ]);
         setEntries(e);
         setWater(w);
         setStepsState(st);
+        setCreatina(cr);
       } catch (err) {
         toast("No se pudo cargar el d\xEDa");
       } finally {
         setLoading(false);
       }
-    }, [profile.id, date, toast]);
+    }, [profile.id, date, toast, tomaCreatina]);
     (0, import_react8.useEffect)(() => {
       load();
     }, [load]);
@@ -3122,7 +3165,37 @@ react-dom/cjs/react-dom.production.min.js:
           toast("Pasos actualizados");
         }
       }
-    ) : /* @__PURE__ */ import_react8.default.createElement("button", { className: "btn btn-ghost btn-sm btn-block", style: { marginTop: 10 }, onClick: () => setEditSteps(true) }, "\u270E Poner el total a mano"), /* @__PURE__ */ import_react8.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", margin: "8px 0 0" } }, "Las kcal andando no se suman a lo que puedes comer: tu factor de actividad ya las incluye.")), insights.length > 0 && /* @__PURE__ */ import_react8.default.createElement("div", { className: "px", style: { padding: "10px 12px" } }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "eyebrow", style: { marginBottom: 4 } }, "C\xF3mo va el d\xEDa"), insights.map((x, i) => /* @__PURE__ */ import_react8.default.createElement(Insight, { key: i, ...x }))), MEALS.map((m) => {
+    ) : /* @__PURE__ */ import_react8.default.createElement("button", { className: "btn btn-ghost btn-sm btn-block", style: { marginTop: 10 }, onClick: () => setEditSteps(true) }, "\u270E Poner el total a mano"), /* @__PURE__ */ import_react8.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", margin: "8px 0 0" } }, "Las kcal andando no se suman a lo que puedes comer: tu factor de actividad ya las incluye.")), tomaCreatina && /* @__PURE__ */ import_react8.default.createElement(
+      "button",
+      {
+        className: "px",
+        onClick: async () => {
+          const nuevo = !creatina;
+          setCreatina(nuevo);
+          try {
+            await setHabit(profile.id, date, "creatina", nuevo);
+            if (nuevo && navigator.vibrate) navigator.vibrate(20);
+          } catch {
+            setCreatina(!nuevo);
+            toast("No se pudo guardar");
+          }
+        },
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          width: "100%",
+          textAlign: "left",
+          padding: 12,
+          cursor: "pointer",
+          color: "inherit"
+        },
+        "aria-pressed": creatina
+      },
+      /* @__PURE__ */ import_react8.default.createElement(PixelCheck, { on: creatina, size: 30 }),
+      /* @__PURE__ */ import_react8.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "eyebrow" }, "Creatina ", jp("\u7FD2\u6163")), /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: claro ? 17 : 15 } }, creatina ? "Tomada" : "Todav\xEDa no")),
+      /* @__PURE__ */ import_react8.default.createElement("span", { className: "tiny dim" }, creatina ? "\u2713" : "toca para marcar")
+    ), insights.length > 0 && /* @__PURE__ */ import_react8.default.createElement("div", { className: "px", style: { padding: "10px 12px" } }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "eyebrow", style: { marginBottom: 4 } }, "C\xF3mo va el d\xEDa"), insights.map((x, i) => /* @__PURE__ */ import_react8.default.createElement(Insight, { key: i, ...x }))), MEALS.map((m) => {
       const rows = byMeal[m.key] || [];
       const kcal = rows.reduce((a, r) => a + Number(r.kcal), 0);
       const target = perMeal[m.key];
@@ -3746,15 +3819,11 @@ react-dom/cjs/react-dom.production.min.js:
       const m = scaleFood(sel, grams);
       const raciones = [30, 50, 100, 150, 200, Number(sel.default_serving_g) || 100].filter((v, i, a) => v > 0 && a.indexOf(v) === i).sort((a, b) => a - b);
       return /* @__PURE__ */ import_react12.default.createElement("div", { className: "px", style: { padding: 12 } }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement("strong", { style: { fontFamily: "var(--font-display)", fontSize: 15 } }, sel.name), sel.brand && /* @__PURE__ */ import_react12.default.createElement("div", { className: "tiny dim" }, sel.brand)), /* @__PURE__ */ import_react12.default.createElement("button", { className: "icon-btn", onClick: () => setSel(null), "aria-label": "Elegir otro" }, "\u2715")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "row", style: { marginTop: 8 } }, /* @__PURE__ */ import_react12.default.createElement(
-        "input",
+        NumberInput,
         {
           className: "input num grow",
-          type: "number",
-          inputMode: "decimal",
           value: grams,
-          min: "0",
-          step: "5",
-          onChange: (e) => setGrams(Math.max(0, Number(e.target.value)))
+          onChange: (v) => setGrams(Math.max(0, v))
         }
       ), /* @__PURE__ */ import_react12.default.createElement("span", { className: "dim num" }, "g")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "chips", style: { marginTop: 6 } }, raciones.map((g) => /* @__PURE__ */ import_react12.default.createElement("button", { key: g, className: "chip", "data-on": grams === g, onClick: () => setGrams(g) }, g, " g"))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "tiny num dim", style: { marginTop: 6 } }, Math.round(m.kcal), " kcal \xB7 P", m.protein, " C", m.carbs, " G", m.fat), /* @__PURE__ */ import_react12.default.createElement(
         "button",
@@ -4083,6 +4152,54 @@ react-dom/cjs/react-dom.production.min.js:
   init_define_import_meta_env();
   var import_react13 = __toESM(__require("react"), 1);
   init_ui();
+
+  // src/lib/gym.js
+  init_define_import_meta_env();
+  var import_supabase_js2 = __require("@supabase/supabase-js");
+  var GYM_URL = "https://sjebkqsaqdhliyszaiag.supabase.co";
+  var GYM_KEY = "sb_publishable_eLMLnuUVLfZRGzMq8pgLFA_LLPg39pp";
+  var cliente = null;
+  function gym() {
+    if (!cliente) {
+      cliente = (0, import_supabase_js2.createClient)(GYM_URL, GYM_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false, storageKey: "kome-gym" }
+      });
+    }
+    return cliente;
+  }
+  var limpia = (s) => String(s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  var personas = null;
+  async function listaPersonas() {
+    if (personas) return personas;
+    const { data, error } = await gym().from("gym_people").select("id, name");
+    if (error) throw error;
+    personas = data || [];
+    return personas;
+  }
+  async function personaDelGimnasio(nombre) {
+    const buscado = limpia(nombre);
+    if (!buscado) return null;
+    const lista = await listaPersonas();
+    return lista.find((p) => limpia(p.name) === buscado) || null;
+  }
+  async function pesosDelGimnasio(nombre, limite = 120) {
+    const persona = await personaDelGimnasio(nombre);
+    if (!persona) return null;
+    const { data, error } = await gym().from("gym_bodylog").select("id, date, weight").eq("person_id", persona.id).not("weight", "is", null).order("date", { ascending: false }).limit(limite);
+    if (error) throw error;
+    return (data || []).map((x) => ({
+      id: `gym-${x.id}`,
+      date: x.date,
+      weight_kg: Number(x.weight),
+      delGimnasio: true
+    }));
+  }
+  async function ultimoPesoDelGimnasio(nombre) {
+    const pesos = await pesosDelGimnasio(nombre, 1);
+    return pesos && pesos.length ? pesos[0].weight_kg : null;
+  }
+
+  // src/pages/Progress.jsx
   var RANGES = [
     { key: 7, label: "7 d\xEDas", jp: "\u9031" },
     { key: 30, label: "30 d\xEDas", jp: "\u6708" },
@@ -4103,26 +4220,34 @@ react-dom/cjs/react-dom.production.min.js:
     const [loading, setLoading] = (0, import_react13.useState)(true);
     const [weighIn, setWeighIn] = (0, import_react13.useState)(false);
     const [w, setW] = (0, import_react13.useState)("");
+    const [delGym, setDelGym] = (0, import_react13.useState)(false);
     const targets = (0, import_react13.useMemo)(() => targetsFor(profile), [profile]);
     const load = (0, import_react13.useCallback)(async () => {
       setLoading(true);
       try {
-        const [s, wl, wa, st] = await Promise.all([
+        const [s, wl, wa, st, gym2] = await Promise.all([
           getSeries(profile.id, range),
           listWeights(profile.id),
           getWaterSeries(profile.id, range),
-          getStepsSeries(profile.id, range)
+          getStepsSeries(profile.id, range),
+          pesosDelGimnasio(profile.name).catch(() => null)
         ]);
         setDays(s);
-        setWeights(wl);
         setWaterDays(wa);
         setStepDays(st);
+        if (gym2 && gym2.length) {
+          setWeights(gym2);
+          setDelGym(true);
+        } else {
+          setWeights(wl);
+          setDelGym(false);
+        }
       } catch {
         toast("No se pudo cargar el hist\xF3rico");
       } finally {
         setLoading(false);
       }
-    }, [profile.id, range, toast]);
+    }, [profile.id, profile.name, range, toast]);
     (0, import_react13.useEffect)(() => {
       load();
     }, [load]);
@@ -4218,10 +4343,10 @@ react-dom/cjs/react-dom.production.min.js:
         height: 80,
         colorFor: (d) => !d.value ? "var(--line-soft)" : d.value >= stepsGoal ? "var(--matcha)" : "#6f9c58"
       }
-    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "row", style: { gap: 14, marginTop: 10, flexWrap: "wrap" } }, /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "total ", stepsTotal.toLocaleString("es-ES"), " pasos"), /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "\u2248 ", walkTotal.km.toString().replace(".", ","), " km"), walkTotal.kcal ? /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "\u2248 ", walkTotal.kcal, " kcal") : null), stepsLogged.length > 0 && /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", marginBottom: 0, marginTop: 6 } }, stepsAvg >= 8e3 ? "Buen nivel de actividad diaria: por encima de 8.000 pasos ya hay beneficio claro para la salud." : "Subir hacia los 7.000-8.000 pasos diarios es donde m\xE1s se nota la mejora, seg\xFAn los estudios de mortalidad por actividad.")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "eyebrow" }, "Peso ", jp("\u4F53\u91CD")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "num", style: { fontSize: 21 } }, wLast ? `${wLast} kg` : "\u2014", wDelta != null && wDelta !== 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny", style: { color: wDelta < 0 ? "var(--matcha)" : "var(--lantern)", marginLeft: 8 } }, wDelta > 0 ? "+" : "", wDelta, " kg"))), /* @__PURE__ */ import_react13.default.createElement("button", { className: "btn btn-sm", onClick: () => {
+    ), /* @__PURE__ */ import_react13.default.createElement("div", { className: "row", style: { gap: 14, marginTop: 10, flexWrap: "wrap" } }, /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "total ", stepsTotal.toLocaleString("es-ES"), " pasos"), /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "\u2248 ", walkTotal.km.toString().replace(".", ","), " km"), walkTotal.kcal ? /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny num dim" }, "\u2248 ", walkTotal.kcal, " kcal") : null), stepsLogged.length > 0 && /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny", style: { color: "var(--muted-2)", marginBottom: 0, marginTop: 6 } }, stepsAvg >= 8e3 ? "Buen nivel de actividad diaria: por encima de 8.000 pasos ya hay beneficio claro para la salud." : "Subir hacia los 7.000-8.000 pasos diarios es donde m\xE1s se nota la mejora, seg\xFAn los estudios de mortalidad por actividad.")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react13.default.createElement("div", null, /* @__PURE__ */ import_react13.default.createElement("div", { className: "eyebrow" }, "Peso ", jp("\u4F53\u91CD")), /* @__PURE__ */ import_react13.default.createElement("div", { className: "num", style: { fontSize: 21 } }, wLast ? `${wLast} kg` : "\u2014", wDelta != null && wDelta !== 0 && /* @__PURE__ */ import_react13.default.createElement("span", { className: "tiny", style: { color: wDelta < 0 ? "var(--matcha)" : "var(--lantern)", marginLeft: 8 } }, wDelta > 0 ? "+" : "", wDelta, " kg"))), delGym ? /* @__PURE__ */ import_react13.default.createElement("span", { className: "tag" }, "del gimnasio") : /* @__PURE__ */ import_react13.default.createElement("button", { className: "btn btn-sm", onClick: () => {
       setW(wLast || profile.weight_kg || "");
       setWeighIn(true);
-    } }, "Apuntar peso")), /* @__PURE__ */ import_react13.default.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ import_react13.default.createElement(PixelLine, { points: weightPoints })), goal.kg !== 0 && /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny dim", style: { marginBottom: 0 } }, "Con el objetivo \u201C", goal.label, "\u201D la previsi\xF3n razonable es ", goal.kg > 0 ? "+" : "", goal.kg, " kg por semana. El peso oscila con l\xEDquidos y gluc\xF3geno: f\xEDjate en la tendencia de dos semanas, no en el d\xEDa."), weights.length > 0 && /* @__PURE__ */ import_react13.default.createElement("details", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react13.default.createElement("summary", { className: "tiny dim", style: { cursor: "pointer" } }, "Ver todos los pesajes"), weights.map((x) => /* @__PURE__ */ import_react13.default.createElement("div", { key: x.id, className: "entry" }, /* @__PURE__ */ import_react13.default.createElement("span", { className: "grow tiny" }, (/* @__PURE__ */ new Date(x.date + "T12:00:00")).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "2-digit" })), /* @__PURE__ */ import_react13.default.createElement("span", { className: "num tiny" }, x.weight_kg, " kg"), /* @__PURE__ */ import_react13.default.createElement("button", { className: "icon-btn tiny", onClick: async () => {
+    } }, "Apuntar peso")), /* @__PURE__ */ import_react13.default.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ import_react13.default.createElement(PixelLine, { points: weightPoints })), goal.kg !== 0 && /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny dim", style: { marginBottom: 0 } }, "Con el objetivo \u201C", goal.label, "\u201D la previsi\xF3n razonable es ", goal.kg > 0 ? "+" : "", goal.kg, " kg por semana. El peso oscila con l\xEDquidos y gluc\xF3geno: f\xEDjate en la tendencia de dos semanas, no en el d\xEDa."), delGym && /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny dim", style: { marginTop: 8, marginBottom: 0 } }, "Los pesajes vienen de la app del gimnasio, de la pesta\xF1a Cuerpo. Ap\xFAntalos all\xED y aqu\xED se ven solos."), weights.length > 0 && /* @__PURE__ */ import_react13.default.createElement("details", { style: { marginTop: 10 } }, /* @__PURE__ */ import_react13.default.createElement("summary", { className: "tiny dim", style: { cursor: "pointer" } }, "Ver todos los pesajes"), weights.map((x) => /* @__PURE__ */ import_react13.default.createElement("div", { key: x.id, className: "entry" }, /* @__PURE__ */ import_react13.default.createElement("span", { className: "grow tiny" }, (/* @__PURE__ */ new Date(x.date + "T12:00:00")).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "2-digit" })), /* @__PURE__ */ import_react13.default.createElement("span", { className: "num tiny" }, x.weight_kg, " kg"), !x.delGimnasio && /* @__PURE__ */ import_react13.default.createElement("button", { className: "icon-btn tiny", onClick: async () => {
       await deleteWeight(x.id);
       load();
     }, "aria-label": "Borrar" }, "\u2715"))))), loading && /* @__PURE__ */ import_react13.default.createElement("div", { className: "center tiny dim blink" }, "cargando\u2026"), /* @__PURE__ */ import_react13.default.createElement(Sheet, { open: weighIn, onClose: () => setWeighIn(false), title: "Apuntar peso", jp: "\u4F53\u91CD" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "stack" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react13.default.createElement("label", null, "Peso de hoy (kg)"), /* @__PURE__ */ import_react13.default.createElement(
@@ -4232,8 +4357,7 @@ react-dom/cjs/react-dom.production.min.js:
         step: "0.1",
         inputMode: "decimal",
         value: w,
-        onChange: (e) => setW(e.target.value),
-        autoFocus: true
+        onChange: (e) => setW(e.target.value)
       }
     )), /* @__PURE__ */ import_react13.default.createElement("p", { className: "tiny dim" }, "P\xE9sate en ayunas, despu\xE9s del ba\xF1o y sin ropa. Siempre en las mismas condiciones."), /* @__PURE__ */ import_react13.default.createElement(
       "button",
@@ -4292,9 +4416,6 @@ react-dom/cjs/react-dom.production.min.js:
         /* @__PURE__ */ import_react14.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react14.default.createElement("div", { style: { fontSize: 15 } }, r.name), /* @__PURE__ */ import_react14.default.createElement("div", { className: "tiny num dim" }, Math.round(r.kcal), " kcal", ((_a = r.liked_by) == null ? void 0 : _a.length) ? " \xB7 " + profiles.filter((p) => r.liked_by.includes(p.id)).map((p) => p.avatar_emoji).join("") : ""))
       );
     }), !list.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty tiny" }, "No hay recetas que encajen.")), /* @__PURE__ */ import_react14.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react14.default.createElement("label", null, "O ap\xFAntalo a mano"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react14.default.createElement("input", { className: "input grow", value: free, onChange: (e) => setFree(e.target.value), placeholder: "Cenar fuera, sobras\u2026" }), /* @__PURE__ */ import_react14.default.createElement("button", { className: "btn", disabled: !free.trim(), onClick: () => onPick({ note: free.trim() }) }, "Poner")))));
-  }
-  function PixelCheck({ on }) {
-    return /* @__PURE__ */ import_react14.default.createElement("svg", { viewBox: "0 0 12 12", width: "26", height: "26", shapeRendering: "crispEdges", "aria-hidden": "true" }, /* @__PURE__ */ import_react14.default.createElement("rect", { x: "0", y: "0", width: "12", height: "12", fill: on ? "var(--matcha)" : "var(--night)" }), /* @__PURE__ */ import_react14.default.createElement("g", { fill: "var(--line)" }, /* @__PURE__ */ import_react14.default.createElement("rect", { x: "0", y: "0", width: "12", height: "1" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "0", y: "11", width: "12", height: "1" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "0", y: "0", width: "1", height: "12" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "11", y: "0", width: "1", height: "12" })), on && /* @__PURE__ */ import_react14.default.createElement("g", { fill: "var(--night)" }, /* @__PURE__ */ import_react14.default.createElement("rect", { x: "2", y: "6", width: "2", height: "2" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "4", y: "8", width: "2", height: "2" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "6", y: "6", width: "2", height: "2" }), /* @__PURE__ */ import_react14.default.createElement("rect", { x: "8", y: "4", width: "2", height: "2" })));
   }
   function ShoppingList({ open, onClose, profileId, toast }) {
     const [items, setItems] = (0, import_react14.useState)([]);
@@ -4390,7 +4511,24 @@ react-dom/cjs/react-dom.production.min.js:
           }
         },
         "\u2715"
-      )))), !loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty" }, /* @__PURE__ */ import_react14.default.createElement("div", { style: { fontSize: 30 } }, "\u{1F9FA}"), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny" }, "La lista est\xE1 vac\xEDa. Ve apuntando lo que falte en casa.")), pending.length > 0 && /* @__PURE__ */ import_react14.default.createElement(
+      )))), !loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty" }, /* @__PURE__ */ import_react14.default.createElement("div", { style: { fontSize: 30 } }, "\u{1F9FA}"), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny" }, "La lista est\xE1 vac\xEDa. Ve apuntando lo que falte en casa.")), items.length > 0 && /* @__PURE__ */ import_react14.default.createElement(
+        "button",
+        {
+          className: "btn btn-ghost btn-block btn-sm",
+          onClick: async () => {
+            if (!confirm(`\xBFBorrar la lista entera? Se van las ${items.length} cosas, compradas y por comprar.`)) return;
+            setItems([]);
+            try {
+              await clearAllShopping();
+              toast("Lista borrada");
+            } catch {
+              toast("No se pudo borrar");
+            }
+            load();
+          }
+        },
+        "\u{1F5D1} Borrar la lista entera"
+      ), pending.length > 0 && /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
           className: "btn btn-block btn-sm",
@@ -4651,7 +4789,7 @@ react-dom/cjs/react-dom.production.min.js:
         /* @__PURE__ */ import_react15.default.createElement("span", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("span", { style: { fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600 } }, t2.label), /* @__PURE__ */ import_react15.default.createElement("span", { className: "tiny dim", style: { display: "block" } }, t2.hint)),
         /* @__PURE__ */ import_react15.default.createElement("span", { className: "num", style: { color: on ? "var(--sakura)" : "var(--muted-2)", fontSize: 20 } }, on ? "\u25CF" : "\u25CB")
       );
-    })), dirty && normalizeTheme(f.theme) !== normalizeTheme(profile.theme) && /* @__PURE__ */ import_react15.default.createElement(Insight, { tone: "info", text: "Est\xE1s viendo el tema nuevo. Se queda fijo cuando guardes los cambios abajo." })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "eyebrow", style: { marginBottom: 10 } }, "Tus datos"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Sexo"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.sex || "f", onChange: (e) => set("sex", e.target.value) }, /* @__PURE__ */ import_react15.default.createElement("option", { value: "f" }, "Mujer"), /* @__PURE__ */ import_react15.default.createElement("option", { value: "m" }, "Hombre"))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Nacimiento"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input", type: "date", value: f.birth_date || "", onChange: (e) => set("birth_date", e.target.value) }))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Altura (cm)"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input num", type: "number", inputMode: "decimal", value: f.height_cm || "", onChange: (e) => set("height_cm", e.target.value) })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Peso (kg)"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input num", type: "number", step: "0.1", inputMode: "decimal", value: f.weight_kg || "", onChange: (e) => set("weight_kg", e.target.value) }))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field", style: { marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Actividad diaria"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.activity_level || "ligero", onChange: (e) => set("activity_level", e.target.value) }, Object.entries(ACTIVITY).map(([k, v]) => /* @__PURE__ */ import_react15.default.createElement("option", { key: k, value: k }, v.label, " \u2014 ", v.hint)))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field", style: { marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Objetivo"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.goal || "mantener", onChange: (e) => set("goal", e.target.value) }, Object.entries(GOALS).map(([k, v]) => /* @__PURE__ */ import_react15.default.createElement("option", { key: k, value: k }, v.label, v.kg ? ` (${v.kg > 0 ? "+" : ""}${v.kg} kg/semana)` : "")))), age != null && /* @__PURE__ */ import_react15.default.createElement("p", { className: "tiny dim", style: { marginBottom: 0 } }, age, " a\xF1os")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "eyebrow" }, "Objetivos del d\xEDa"), /* @__PURE__ */ import_react15.default.createElement("label", { className: "row tiny", style: { gap: 6, cursor: "pointer" } }, /* @__PURE__ */ import_react15.default.createElement("input", { type: "checkbox", checked: !!f.auto_targets, onChange: (e) => set("auto_targets", e.target.checked) }), "calcular solo")), f.auto_targets ? t.auto ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10, flexWrap: "wrap" } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, "Metabolismo basal"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17 } }, t.bmr, " kcal")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, "Gasto total (\xD7", t.factor, ")"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17 } }, t.tdee, " kcal")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, t.goalLabel), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17, color: "var(--sakura)" } }, t.kcal, " kcal"))), /* @__PURE__ */ import_react15.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--sakura)" } }, "P ", t.protein, " g (", t.proteinPerKg, " g/kg)"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--lantern)" } }, "C ", t.carbs, " g"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--mizu)" } }, "G ", t.fat, " g"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--matcha)" } }, "Fibra ", t.fiber, " g")), /* @__PURE__ */ import_react15.default.createElement("p", { className: "tiny dim", style: { marginTop: 8, marginBottom: 0 } }, "Calculado con Mifflin-St Jeor y tu factor de actividad. La prote\xEDna se fija por kilo de peso, la grasa tambi\xE9n, y el carbohidrato ocupa la energ\xEDa restante."), t.warn && /* @__PURE__ */ import_react15.default.createElement(Insight, { tone: "warn", text: t.warn }), (_a = t.notes) == null ? void 0 : _a.map((n, i) => /* @__PURE__ */ import_react15.default.createElement(Insight, { key: i, tone: "info", text: n })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Prote\xEDna g/kg"), /* @__PURE__ */ import_react15.default.createElement(
+    })), dirty && normalizeTheme(f.theme) !== normalizeTheme(profile.theme) && /* @__PURE__ */ import_react15.default.createElement(Insight, { tone: "info", text: "Est\xE1s viendo el tema nuevo. Se queda fijo cuando guardes los cambios abajo." })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "eyebrow", style: { marginBottom: 10 } }, "Tus datos"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Sexo"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.sex || "f", onChange: (e) => set("sex", e.target.value) }, /* @__PURE__ */ import_react15.default.createElement("option", { value: "f" }, "Mujer"), /* @__PURE__ */ import_react15.default.createElement("option", { value: "m" }, "Hombre"))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Nacimiento"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input", type: "date", value: f.birth_date || "", onChange: (e) => set("birth_date", e.target.value) }))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Altura (cm)"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input num", type: "number", inputMode: "decimal", value: f.height_cm || "", onChange: (e) => set("height_cm", e.target.value) })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Peso (kg)"), /* @__PURE__ */ import_react15.default.createElement("input", { className: "input num", type: "number", step: "0.1", inputMode: "decimal", value: f.weight_kg || "", onChange: (e) => set("weight_kg", e.target.value) }))), /* @__PURE__ */ import_react15.default.createElement("p", { className: "tiny dim", style: { margin: "6px 0 0" } }, "Si te pesas en la app del gimnasio, el peso se trae solo de all\xED cada vez que entras."), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field", style: { marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Actividad diaria"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.activity_level || "ligero", onChange: (e) => set("activity_level", e.target.value) }, Object.entries(ACTIVITY).map(([k, v]) => /* @__PURE__ */ import_react15.default.createElement("option", { key: k, value: k }, v.label, " \u2014 ", v.hint)))), /* @__PURE__ */ import_react15.default.createElement("div", { className: "field", style: { marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Objetivo"), /* @__PURE__ */ import_react15.default.createElement("select", { className: "input", value: f.goal || "mantener", onChange: (e) => set("goal", e.target.value) }, Object.entries(GOALS).map(([k, v]) => /* @__PURE__ */ import_react15.default.createElement("option", { key: k, value: k }, v.label, v.kg ? ` (${v.kg > 0 ? "+" : ""}${v.kg} kg/semana)` : "")))), age != null && /* @__PURE__ */ import_react15.default.createElement("p", { className: "tiny dim", style: { marginBottom: 0 } }, age, " a\xF1os")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "px", style: { padding: 14 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "row-b" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "eyebrow" }, "Objetivos del d\xEDa"), /* @__PURE__ */ import_react15.default.createElement("label", { className: "row tiny", style: { gap: 6, cursor: "pointer" } }, /* @__PURE__ */ import_react15.default.createElement("input", { type: "checkbox", checked: !!f.auto_targets, onChange: (e) => set("auto_targets", e.target.checked) }), "calcular solo")), f.auto_targets ? t.auto ? /* @__PURE__ */ import_react15.default.createElement(import_react15.default.Fragment, null, /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10, flexWrap: "wrap" } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, "Metabolismo basal"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17 } }, t.bmr, " kcal")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, "Gasto total (\xD7", t.factor, ")"), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17 } }, t.tdee, " kcal")), /* @__PURE__ */ import_react15.default.createElement("div", { className: "grow" }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "tiny dim" }, t.goalLabel), /* @__PURE__ */ import_react15.default.createElement("div", { className: "num", style: { fontSize: 17, color: "var(--sakura)" } }, t.kcal, " kcal"))), /* @__PURE__ */ import_react15.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--sakura)" } }, "P ", t.protein, " g (", t.proteinPerKg, " g/kg)"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--lantern)" } }, "C ", t.carbs, " g"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--mizu)" } }, "G ", t.fat, " g"), /* @__PURE__ */ import_react15.default.createElement("span", { className: "num tiny", style: { color: "var(--matcha)" } }, "Fibra ", t.fiber, " g")), /* @__PURE__ */ import_react15.default.createElement("p", { className: "tiny dim", style: { marginTop: 8, marginBottom: 0 } }, "Calculado con Mifflin-St Jeor y tu factor de actividad. La prote\xEDna se fija por kilo de peso, la grasa tambi\xE9n, y el carbohidrato ocupa la energ\xEDa restante."), t.warn && /* @__PURE__ */ import_react15.default.createElement(Insight, { tone: "warn", text: t.warn }), (_a = t.notes) == null ? void 0 : _a.map((n, i) => /* @__PURE__ */ import_react15.default.createElement(Insight, { key: i, tone: "info", text: n })), /* @__PURE__ */ import_react15.default.createElement("div", { className: "row", style: { gap: 10, marginTop: 10 } }, /* @__PURE__ */ import_react15.default.createElement("div", { className: "field grow" }, /* @__PURE__ */ import_react15.default.createElement("label", null, "Prote\xEDna g/kg"), /* @__PURE__ */ import_react15.default.createElement(
       "input",
       {
         className: "input num",
@@ -4747,6 +4885,22 @@ react-dom/cjs/react-dom.production.min.js:
       setMsg(text);
       setTimeout(() => setMsg(""), 2200);
     }, []);
+    (0, import_react16.useEffect)(() => {
+      if (!(profile == null ? void 0 : profile.name)) return;
+      let vivo = true;
+      ultimoPesoDelGimnasio(profile.name).then(async (kg) => {
+        if (!vivo || !kg) return;
+        if (Math.abs(kg - Number(profile.weight_kg || 0)) < 0.05) return;
+        const nuevo = await updateProfile(profile.id, { weight_kg: kg });
+        if (!vivo) return;
+        setProfile(nuevo);
+        setProfiles((ps) => ps.map((x) => x.id === nuevo.id ? nuevo : x));
+      }).catch(() => {
+      });
+      return () => {
+        vivo = false;
+      };
+    }, [profile == null ? void 0 : profile.id, profile == null ? void 0 : profile.name, profile == null ? void 0 : profile.weight_kg]);
     const loadRecipes = (0, import_react16.useCallback)(() => {
       listRecipes().then(setRecipes).catch(() => {
       });

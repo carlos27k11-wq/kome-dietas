@@ -1,4 +1,56 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
+
+/* -------- casilla de marcar -------- */
+export function PixelCheck({ on, size = 26 }) {
+  return (
+    <svg viewBox="0 0 12 12" width={size} height={size} shapeRendering="crispEdges" aria-hidden="true">
+      <rect x="0" y="0" width="12" height="12" fill={on ? "var(--matcha)" : "var(--night)"} />
+      <g fill="var(--line)">
+        <rect x="0" y="0" width="12" height="1" /><rect x="0" y="11" width="12" height="1" />
+        <rect x="0" y="0" width="1" height="12" /><rect x="11" y="0" width="1" height="12" />
+      </g>
+      {on && (
+        <g fill="var(--night)">
+          <rect x="2" y="6" width="2" height="2" />
+          <rect x="4" y="8" width="2" height="2" />
+          <rect x="6" y="6" width="2" height="2" />
+          <rect x="8" y="4" width="2" height="2" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+/* -------- campo numérico --------
+   Guarda por dentro lo que escribes, no un número: así al borrar
+   la cifra no aparece un 0 delante de lo siguiente que teclees. */
+export function NumberInput({ value, onChange, className = "input num", ...props }) {
+  const [txt, setTxt] = useState(() => (value == null || value === "" ? "" : String(value)));
+  const mio = useRef(value);
+
+  // si el valor cambia desde fuera (los botones de ración, por ejemplo)
+  useEffect(() => {
+    if (value !== mio.current) { mio.current = value; setTxt(value == null ? "" : String(value)); }
+  }, [value]);
+
+  return (
+    <input
+      className={className}
+      inputMode="decimal"
+      value={txt}
+      onChange={(e) => {
+        let t = e.target.value.replace(",", ".").replace(/[^\d.]/g, "");
+        t = t.replace(/^0+(?=\d)/, "");          // fuera el cero de delante
+        const punto = t.indexOf(".");
+        if (punto >= 0) t = t.slice(0, punto + 1) + t.slice(punto + 1).replace(/\./g, "");
+        setTxt(t);
+        const n = t === "" || t === "." ? 0 : Number(t);
+        if (isFinite(n)) { mio.current = n; onChange(n); }
+      }}
+      {...props}
+    />
+  );
+}
 
 /* -------- hoja modal -------- */
 export function Sheet({ open, onClose, title, jp, children, footer }) {

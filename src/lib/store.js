@@ -291,6 +291,37 @@ export async function setSteps(profileId, date, steps) {
   if (error) throw error;
   return value;
 }
+/* ---------------- hábitos del día ----------------
+   Cosas que solo se marcan, sin cantidad (la creatina). */
+
+export async function getHabit(profileId, date, habit) {
+  const { data, error } = await supabase
+    .from("habit_logs").select("done")
+    .eq("profile_id", profileId).eq("date", date).eq("habit", habit).maybeSingle();
+  if (error) throw error;
+  return !!data?.done;
+}
+
+export async function setHabit(profileId, date, habit, done) {
+  const { error } = await supabase
+    .from("habit_logs")
+    .upsert({ profile_id: profileId, date, habit, done }, { onConflict: "profile_id,date,habit" });
+  if (error) throw error;
+  return done;
+}
+
+/** Los días con el hábito cumplido, para la racha del registro. */
+export async function habitDays(profileId, habit, days = 30, endDate = null) {
+  const fin = endDate || new Date().toISOString().slice(0, 10);
+  const ini = new Date(new Date(fin).getTime() - (days - 1) * 86400000).toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("habit_logs").select("date, done")
+    .eq("profile_id", profileId).eq("habit", habit).eq("done", true)
+    .gte("date", ini).lte("date", fin);
+  if (error) throw error;
+  return (data || []).map((x) => x.date);
+}
+
 
 /* ---------------- series de agua y pasos ---------------- */
 
@@ -421,5 +452,11 @@ export async function deleteShoppingItem(id) {
 
 export async function clearDoneShopping() {
   const { error } = await supabase.from("shopping_items").delete().eq("done", true);
+  if (error) throw error;
+}
+
+/** Borrar la lista entera, comprado y por comprar. */
+export async function clearAllShopping() {
+  const { error } = await supabase.from("shopping_items").delete().not("id", "is", null);
   if (error) throw error;
 }

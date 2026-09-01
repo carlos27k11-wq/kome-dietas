@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sheet } from "../components/ui";
+import { Sheet, NumberInput } from "../components/ui";
 import { useTheme, Jp } from "../components/theme";
 import {
   saveFood, saveRecipe, deleteRecipe, getRecipeIngredients,
@@ -168,8 +168,8 @@ function IngredientPicker({ onAdd }) {
           <button className="icon-btn" onClick={() => setSel(null)} aria-label="Elegir otro">✕</button>
         </div>
         <div className="row" style={{ marginTop: 8 }}>
-          <input className="input num grow" type="number" inputMode="decimal" value={grams} min="0" step="5"
-            onChange={(e) => setGrams(Math.max(0, Number(e.target.value)))} />
+          <NumberInput className="input num grow" value={grams}
+            onChange={(v) => setGrams(Math.max(0, v))} />
           <span className="dim num">g</span>
         </div>
         <div className="chips" style={{ marginTop: 6 }}>

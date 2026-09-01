@@ -3,6 +3,7 @@ import { PixelBar, PixelChart, PixelLine, Insight, Sheet } from "../components/u
 import { useTheme, Jp } from "../components/theme";
 import { getSeries, listWeights, saveWeight, deleteWeight, getWaterSeries, getStepsSeries } from "../lib/store";
 import { targetsFor, periodStats, streakOf, isoDate, GOALS, stepsInfo } from "../lib/nutrition";
+import { pesosDelGimnasio } from "../lib/gym";
 
 const RANGES = [
   { key: 7, label: "7 días", jp: "週" },
@@ -32,22 +33,27 @@ export default function Progress({ profile, toast }) {
   const [loading, setLoading] = useState(true);
   const [weighIn, setWeighIn] = useState(false);
   const [w, setW] = useState("");
+  const [delGym, setDelGym] = useState(false);   // el peso lo lleva el gimnasio
 
   const targets = useMemo(() => targetsFor(profile), [profile]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, wl, wa, st] = await Promise.all([
+      const [s, wl, wa, st, gym] = await Promise.all([
         getSeries(profile.id, range),
         listWeights(profile.id),
         getWaterSeries(profile.id, range),
         getStepsSeries(profile.id, range),
+        pesosDelGimnasio(profile.name).catch(() => null),
       ]);
-      setDays(s); setWeights(wl); setWaterDays(wa); setStepDays(st);
+      setDays(s); setWaterDays(wa); setStepDays(st);
+      // si esa persona está en la app del gimnasio, manda lo de allí
+      if (gym && gym.length) { setWeights(gym); setDelGym(true); }
+      else { setWeights(wl); setDelGym(false); }
     } catch { toast("No se pudo cargar el histórico"); }
     finally { setLoading(false); }
-  }, [profile.id, range, toast]);
+  }, [profile.id, profile.name, range, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -264,7 +270,13 @@ export default function Progress({ profile, toast }) {
               )}
             </div>
           </div>
-          <button className="btn btn-sm" onClick={() => { setW(wLast || profile.weight_kg || ""); setWeighIn(true); }}>Apuntar peso</button>
+          {delGym ? (
+            <span className="tag">del gimnasio</span>
+          ) : (
+            <button className="btn btn-sm" onClick={() => { setW(wLast || profile.weight_kg || ""); setWeighIn(true); }}>
+              Apuntar peso
+            </button>
+          )}
         </div>
 
         <div style={{ marginTop: 12 }}>
@@ -278,6 +290,13 @@ export default function Progress({ profile, toast }) {
           </p>
         )}
 
+        {delGym && (
+          <p className="tiny dim" style={{ marginTop: 8, marginBottom: 0 }}>
+            Los pesajes vienen de la app del gimnasio, de la pestaña Cuerpo. Apúntalos allí y
+            aquí se ven solos.
+          </p>
+        )}
+
         {weights.length > 0 && (
           <details style={{ marginTop: 10 }}>
             <summary className="tiny dim" style={{ cursor: "pointer" }}>Ver todos los pesajes</summary>
@@ -285,7 +304,9 @@ export default function Progress({ profile, toast }) {
               <div key={x.id} className="entry">
                 <span className="grow tiny">{new Date(x.date + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "2-digit" })}</span>
                 <span className="num tiny">{x.weight_kg} kg</span>
-                <button className="icon-btn tiny" onClick={async () => { await deleteWeight(x.id); load(); }} aria-label="Borrar">✕</button>
+                {!x.delGimnasio && (
+                  <button className="icon-btn tiny" onClick={async () => { await deleteWeight(x.id); load(); }} aria-label="Borrar">✕</button>
+                )}
               </div>
             ))}
           </details>
@@ -299,7 +320,7 @@ export default function Progress({ profile, toast }) {
           <div className="field">
             <label>Peso de hoy (kg)</label>
             <input className="input num" type="number" step="0.1" inputMode="decimal" value={w}
-              onChange={(e) => setW(e.target.value)} autoFocus />
+              onChange={(e) => setW(e.target.value)} />
           </div>
           <p className="tiny dim">Pésate en ayunas, después del baño y sin ropa. Siempre en las mismas condiciones.</p>
           <button className="btn btn-primary btn-block" disabled={!Number(w)}

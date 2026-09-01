@@ -9,7 +9,8 @@ Un perfil por persona, sin contraseñas, estilo Netflix.
 de kcal repartido por comida. Barras de proteína, carbos y grasa, más el detalle de fibra,
 azúcares, grasa saturada y sodio. Registro de agua (vasos de 250 ml) y de pasos (de mil en mil), o metiendo el total del día a
 mano si lo llevas apuntado en otro sitio. Lectura automática del día con avisos
-nutricionales. Copiar el día anterior de un toque.
+nutricionales. Copiar el día anterior de un toque. Debajo de los pasos, en el perfil de
+Carlos, la **creatina del día**: se marca y ya está, sin gramos que meter (tabla `habit_logs`).
 
 **Recetario** — Dos subpestañas.
 
@@ -35,7 +36,8 @@ a la lista.
 
 **Registro** — Gráfico de kcal por día frente al objetivo (7 / 30 / 90 días), medias de macros,
 constancia, racha, balance energético acumulado y su equivalente en kg. Gráficos de agua y de
-pasos diarios con sus medias. Seguimiento de peso con línea de tendencia. Los días en los que
+pasos diarios con sus medias. Seguimiento de peso con línea de tendencia: **los pesajes los trae
+la app del gimnasio** (ver abajo). Los días en los que
 no apuntas nada no entran en ninguna media: cada media cuenta solo los días con registro y
 dice cuántos son.
 
@@ -126,6 +128,20 @@ El lector prueba por este orden:
 
 Si la cámara deja controlar el zoom, sale un mando debajo del vídeo: acercar el código es lo que
 más ayuda, más que la luz.
+
+## El peso viene del gimnasio
+
+`gym-web` ya lleva el peso de cada uno en su pestaña Cuerpo, así que kome no lo pide dos veces:
+lo lee de allí. Vive en otra cuenta de Supabase (la de la cartera, tabla `gym_bodylog`) y se
+enlaza **por el nombre del perfil**, que es el mismo en las dos apps — Carlos, Nuria, Kina y
+Javi. Solo se lee, nunca se escribe.
+
+Al entrar con un perfil, si en el gimnasio hay un peso más reciente se guarda en su ficha, que
+de él dependen el metabolismo basal y los objetivos. En Registro, la gráfica y la lista de
+pesajes salen del gimnasio y aparece la etiqueta *del gimnasio*.
+
+Si esa persona no está en la app del gimnasio, o no hay conexión, kome sigue con sus propios
+pesajes de siempre y vuelve a salir el botón de apuntar peso. Está en `src/lib/gym.js`.
 
 ## Temas
 

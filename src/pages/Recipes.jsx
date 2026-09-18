@@ -469,7 +469,7 @@ function RecipeEditor({ open, initial, onClose, onSaved, toast, profiles = [] })
 }
 
 /* ---------------- detalle ---------------- */
-function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profiles = [] }) {
+function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profiles = [], profileId }) {
   const [ings, setIngs] = useState([]);
   useEffect(() => { if (recipe) getRecipeIngredients(recipe.id).then(setIngs).catch(() => {}); }, [recipe]);
   if (!recipe) return null;
@@ -541,7 +541,7 @@ function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profil
           <button className="btn btn-block"
             onClick={async () => {
               try {
-                await addShoppingItems(ings.map((i) => ({ text: i.name, qty: fmtGrams(i.grams) })));
+                await addShoppingItems(ings.map((i) => ({ text: i.name, qty: fmtGrams(i.grams) })), profileId);
                 toast(`${ings.length} ingredientes en la lista de la compra`);
               } catch { toast("No se pudo añadir"); }
             }}>
@@ -556,7 +556,7 @@ function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profil
 }
 
 /* ---------------- listado de recetas ---------------- */
-function RecipeList({ recipes, reload, toast, profiles }) {
+function RecipeList({ recipes, reload, toast, profiles, profileId }) {
   const { jpLabel } = useTheme();
   const [cat, setCat] = useState("todas");
   const [who, setWho] = useState("todos");
@@ -640,7 +640,7 @@ function RecipeList({ recipes, reload, toast, profiles }) {
       <RecipeDetail
         recipe={detail} onClose={() => setDetail(null)}
         onEdit={(r) => { setDetail(null); setEditing(r); }}
-        onZoom={setZoom} onReload={reload} toast={toast} profiles={profiles}
+        onZoom={setZoom} onReload={reload} toast={toast} profiles={profiles} profileId={profileId}
       />
 
       <RecipeEditor
@@ -659,7 +659,7 @@ function RecipeList({ recipes, reload, toast, profiles }) {
 }
 
 /* ---------------- página con sus dos subpestañas ---------------- */
-export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
+export default function RecipesPage({ recipes, reload, toast, profiles = [], profileId }) {
   const [sub, setSub] = useState("recetas");
 
   return (
@@ -682,7 +682,7 @@ export default function RecipesPage({ recipes, reload, toast, profiles = [] }) {
       </div>
 
       {sub === "recetas"
-        ? <RecipeList recipes={recipes} reload={reload} toast={toast} profiles={profiles} />
+        ? <RecipeList recipes={recipes} reload={reload} toast={toast} profiles={profiles} profileId={profileId} />
         : <IngredientsTab toast={toast} />}
     </div>
   );

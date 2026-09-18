@@ -4030,7 +4030,7 @@ react-dom/cjs/react-dom.production.min.js:
       "Borrar receta"
     )));
   }
-  function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profiles = [] }) {
+  function RecipeDetail({ recipe, onClose, onEdit, onZoom, onReload, toast, profiles = [], profileId }) {
     var _a;
     const [ings, setIngs] = (0, import_react12.useState)([]);
     (0, import_react12.useEffect)(() => {
@@ -4062,7 +4062,7 @@ react-dom/cjs/react-dom.production.min.js:
         className: "btn btn-block",
         onClick: async () => {
           try {
-            await addShoppingItems(ings.map((i) => ({ text: i.name, qty: fmtGrams(i.grams) })));
+            await addShoppingItems(ings.map((i) => ({ text: i.name, qty: fmtGrams(i.grams) })), profileId);
             toast(`${ings.length} ingredientes en la lista de la compra`);
           } catch {
             toast("No se pudo a\xF1adir");
@@ -4072,7 +4072,7 @@ react-dom/cjs/react-dom.production.min.js:
       "\u{1F9FA} Llevar ingredientes a la compra"
     ), /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-block", onClick: () => onEdit(recipe) }, "Editar receta")));
   }
-  function RecipeList({ recipes, reload, toast, profiles }) {
+  function RecipeList({ recipes, reload, toast, profiles, profileId }) {
     const { jpLabel } = useTheme();
     const [cat, setCat] = (0, import_react12.useState)("todas");
     const [who, setWho] = (0, import_react12.useState)("todos");
@@ -4109,7 +4109,8 @@ react-dom/cjs/react-dom.production.min.js:
         onZoom: setZoom,
         onReload: reload,
         toast,
-        profiles
+        profiles,
+        profileId
       }
     ), /* @__PURE__ */ import_react12.default.createElement(
       RecipeEditor,
@@ -4123,7 +4124,7 @@ react-dom/cjs/react-dom.production.min.js:
       }
     ), zoom && /* @__PURE__ */ import_react12.default.createElement("div", { className: "lightbox", onClick: () => setZoom(null), role: "dialog", "aria-label": "Foto ampliada" }, /* @__PURE__ */ import_react12.default.createElement("img", { src: zoom, alt: "" }), /* @__PURE__ */ import_react12.default.createElement("button", { className: "btn btn-sm", style: { position: "absolute", top: 16, right: 16 }, onClick: () => setZoom(null) }, "Cerrar")));
   }
-  function RecipesPage({ recipes, reload, toast, profiles = [] }) {
+  function RecipesPage({ recipes, reload, toast, profiles = [], profileId }) {
     const [sub, setSub] = (0, import_react12.useState)("recetas");
     return /* @__PURE__ */ import_react12.default.createElement("div", { className: "wrap stack", style: { paddingTop: 12 } }, /* @__PURE__ */ import_react12.default.createElement("div", null, /* @__PURE__ */ import_react12.default.createElement(Jp, null, "\u732E\u7ACB\u5E33"), /* @__PURE__ */ import_react12.default.createElement("h2", { style: { fontSize: 22 } }, "Recetario")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "subtabs", role: "tablist" }, /* @__PURE__ */ import_react12.default.createElement(
       "button",
@@ -4145,7 +4146,7 @@ react-dom/cjs/react-dom.production.min.js:
         onClick: () => setSub("ingredientes")
       },
       "Ingredientes"
-    )), sub === "recetas" ? /* @__PURE__ */ import_react12.default.createElement(RecipeList, { recipes, reload, toast, profiles }) : /* @__PURE__ */ import_react12.default.createElement(IngredientsTab, { toast }));
+    )), sub === "recetas" ? /* @__PURE__ */ import_react12.default.createElement(RecipeList, { recipes, reload, toast, profiles, profileId }) : /* @__PURE__ */ import_react12.default.createElement(IngredientsTab, { toast }));
   }
 
   // src/pages/Progress.jsx
@@ -4417,7 +4418,17 @@ react-dom/cjs/react-dom.production.min.js:
       );
     }), !list.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty tiny" }, "No hay recetas que encajen.")), /* @__PURE__ */ import_react14.default.createElement("hr", { className: "divider" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "field" }, /* @__PURE__ */ import_react14.default.createElement("label", null, "O ap\xFAntalo a mano"), /* @__PURE__ */ import_react14.default.createElement("div", { className: "row" }, /* @__PURE__ */ import_react14.default.createElement("input", { className: "input grow", value: free, onChange: (e) => setFree(e.target.value), placeholder: "Cenar fuera, sobras\u2026" }), /* @__PURE__ */ import_react14.default.createElement("button", { className: "btn", disabled: !free.trim(), onClick: () => onPick({ note: free.trim() }) }, "Poner")))));
   }
-  function ShoppingList({ open, onClose, profileId, toast }) {
+  var fechaCorta = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const dos = (n) => String(n).padStart(2, "0");
+    return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)}`;
+  };
+  function ShoppingList({ open, onClose, profileId, profiles = [], toast }) {
+    const nombreDe = (id) => {
+      var _a;
+      return ((_a = profiles.find((p) => p.id === id)) == null ? void 0 : _a.name) || "";
+    };
     const [items, setItems] = (0, import_react14.useState)([]);
     const [text, setText] = (0, import_react14.useState)("");
     const [loading, setLoading] = (0, import_react14.useState)(true);
@@ -4442,7 +4453,13 @@ react-dom/cjs/react-dom.production.min.js:
       if (!t) return;
       setText("");
       const parts = t.split(",").map((x) => x.trim()).filter(Boolean);
-      setItems((prev) => [...prev, ...parts.map((p, i) => ({ id: `tmp${Date.now()}${i}`, text: p, done: false }))]);
+      setItems((prev) => [...prev, ...parts.map((p, i) => ({
+        id: `tmp${Date.now()}${i}`,
+        text: p,
+        done: false,
+        added_by: profileId,
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      }))]);
       try {
         for (const p of parts) await addShoppingItem(p, profileId);
       } catch {
@@ -4478,7 +4495,7 @@ react-dom/cjs/react-dom.production.min.js:
           placeholder: "Tomates, pan, huevos\u2026",
           enterKeyHint: "done"
         }
-      ), /* @__PURE__ */ import_react14.default.createElement("button", { className: "btn btn-primary", disabled: !text.trim(), onClick: add }, "\uFF0B")), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny dim", style: { margin: 0 } }, "Separa por comas para meter varias cosas de una vez. La lista es de toda la casa."), loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "center tiny dim blink" }, "cargando\u2026"), pending.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "eyebrow", style: { marginBottom: 4 } }, "Por comprar \xB7 ", pending.length), pending.map((it) => /* @__PURE__ */ import_react14.default.createElement("div", { key: it.id, className: "entry" }, /* @__PURE__ */ import_react14.default.createElement("button", { onClick: () => toggle(it), style: { background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }, "aria-label": "Marcar" }, /* @__PURE__ */ import_react14.default.createElement(PixelCheck, { on: false })), /* @__PURE__ */ import_react14.default.createElement("span", { className: "grow", style: { fontSize: 16 } }, it.text), it.qty && /* @__PURE__ */ import_react14.default.createElement("span", { className: "num tiny dim" }, it.qty), /* @__PURE__ */ import_react14.default.createElement(
+      ), /* @__PURE__ */ import_react14.default.createElement("button", { className: "btn btn-primary", disabled: !text.trim(), onClick: add }, "\uFF0B")), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny dim", style: { margin: 0 } }, "Separa por comas para meter varias cosas de una vez. La lista es de toda la casa."), loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "center tiny dim blink" }, "cargando\u2026"), pending.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "eyebrow", style: { marginBottom: 4 } }, "Por comprar \xB7 ", pending.length), pending.map((it) => /* @__PURE__ */ import_react14.default.createElement("div", { key: it.id, className: "entry" }, /* @__PURE__ */ import_react14.default.createElement("button", { onClick: () => toggle(it), style: { background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }, "aria-label": "Marcar" }, /* @__PURE__ */ import_react14.default.createElement(PixelCheck, { on: false })), /* @__PURE__ */ import_react14.default.createElement("span", { className: "grow", style: { fontSize: 16 } }, it.text, nombreDe(it.added_by) && /* @__PURE__ */ import_react14.default.createElement("span", { className: "tiny", style: { color: "var(--muted-2)", marginLeft: 6, textDecoration: "none", display: "inline-block" } }, nombreDe(it.added_by))), it.qty && /* @__PURE__ */ import_react14.default.createElement("span", { className: "num tiny dim" }, it.qty), /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
           className: "icon-btn tiny",
@@ -4489,7 +4506,7 @@ react-dom/cjs/react-dom.production.min.js:
           }
         },
         "\u2715"
-      )))), done.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row-b", style: { marginBottom: 4 } }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "eyebrow" }, "En el carro \xB7 ", done.length), /* @__PURE__ */ import_react14.default.createElement(
+      ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "num tiny dim", style: { minWidth: 58, textAlign: "right" } }, fechaCorta(it.created_at))))), done.length > 0 && /* @__PURE__ */ import_react14.default.createElement("div", null, /* @__PURE__ */ import_react14.default.createElement("div", { className: "row-b", style: { marginBottom: 4 } }, /* @__PURE__ */ import_react14.default.createElement("span", { className: "eyebrow" }, "En el carro \xB7 ", done.length), /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
           className: "btn btn-sm btn-ghost",
@@ -4500,7 +4517,7 @@ react-dom/cjs/react-dom.production.min.js:
           }
         },
         "Vaciar"
-      )), done.map((it) => /* @__PURE__ */ import_react14.default.createElement("div", { key: it.id, className: "entry", style: { opacity: 0.55 } }, /* @__PURE__ */ import_react14.default.createElement("button", { onClick: () => toggle(it), style: { background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }, "aria-label": "Desmarcar" }, /* @__PURE__ */ import_react14.default.createElement(PixelCheck, { on: true })), /* @__PURE__ */ import_react14.default.createElement("span", { className: "grow", style: { fontSize: 16, textDecoration: "line-through" } }, it.text), /* @__PURE__ */ import_react14.default.createElement(
+      )), done.map((it) => /* @__PURE__ */ import_react14.default.createElement("div", { key: it.id, className: "entry", style: { opacity: 0.55 } }, /* @__PURE__ */ import_react14.default.createElement("button", { onClick: () => toggle(it), style: { background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }, "aria-label": "Desmarcar" }, /* @__PURE__ */ import_react14.default.createElement(PixelCheck, { on: true })), /* @__PURE__ */ import_react14.default.createElement("span", { className: "grow", style: { fontSize: 16 } }, /* @__PURE__ */ import_react14.default.createElement("span", { style: { textDecoration: "line-through" } }, it.text), nombreDe(it.added_by) && /* @__PURE__ */ import_react14.default.createElement("span", { className: "tiny", style: { color: "var(--muted-2)", marginLeft: 6, textDecoration: "none", display: "inline-block" } }, nombreDe(it.added_by))), /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
           className: "icon-btn tiny",
@@ -4511,7 +4528,7 @@ react-dom/cjs/react-dom.production.min.js:
           }
         },
         "\u2715"
-      )))), !loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty" }, /* @__PURE__ */ import_react14.default.createElement("div", { style: { fontSize: 30 } }, "\u{1F9FA}"), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny" }, "La lista est\xE1 vac\xEDa. Ve apuntando lo que falte en casa.")), items.length > 0 && /* @__PURE__ */ import_react14.default.createElement(
+      ), /* @__PURE__ */ import_react14.default.createElement("span", { className: "num tiny dim", style: { minWidth: 58, textAlign: "right" } }, fechaCorta(it.created_at))))), !loading && !items.length && /* @__PURE__ */ import_react14.default.createElement("div", { className: "empty" }, /* @__PURE__ */ import_react14.default.createElement("div", { style: { fontSize: 30 } }, "\u{1F9FA}"), /* @__PURE__ */ import_react14.default.createElement("p", { className: "tiny" }, "La lista est\xE1 vac\xEDa. Ve apuntando lo que falte en casa.")), items.length > 0 && /* @__PURE__ */ import_react14.default.createElement(
         "button",
         {
           className: "btn btn-ghost btn-block btn-sm",
@@ -4663,6 +4680,7 @@ react-dom/cjs/react-dom.production.min.js:
         open: shopping,
         onClose: () => setShopping(false),
         profileId: profile.id,
+        profiles,
         toast
       }
     ));
@@ -4959,7 +4977,7 @@ react-dom/cjs/react-dom.production.min.js:
         }
       ));
     }
-    return /* @__PURE__ */ import_react16.default.createElement(ThemeProvider, { theme }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "app" }, tab === "hoy" && /* @__PURE__ */ import_react16.default.createElement(Today, { profile, recipes, toast }), tab === "recetas" && /* @__PURE__ */ import_react16.default.createElement(RecipesPage, { recipes, reload: loadRecipes, toast, profiles }), tab === "plan" && /* @__PURE__ */ import_react16.default.createElement(Plan, { profile, recipes, profiles, toast }), tab === "registro" && /* @__PURE__ */ import_react16.default.createElement(Progress, { profile, toast }), tab === "perfil" && /* @__PURE__ */ import_react16.default.createElement(
+    return /* @__PURE__ */ import_react16.default.createElement(ThemeProvider, { theme }, /* @__PURE__ */ import_react16.default.createElement("div", { className: "app" }, tab === "hoy" && /* @__PURE__ */ import_react16.default.createElement(Today, { profile, recipes, toast }), tab === "recetas" && /* @__PURE__ */ import_react16.default.createElement(RecipesPage, { recipes, reload: loadRecipes, toast, profiles, profileId: profile.id }), tab === "plan" && /* @__PURE__ */ import_react16.default.createElement(Plan, { profile, recipes, profiles, toast }), tab === "registro" && /* @__PURE__ */ import_react16.default.createElement(Progress, { profile, toast }), tab === "perfil" && /* @__PURE__ */ import_react16.default.createElement(
       ProfilePage,
       {
         profile,

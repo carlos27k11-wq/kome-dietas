@@ -176,7 +176,7 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <div className="app">
         {tab === "hoy" && <Today profile={profile} recipes={recipes} toast={toast} />}
-        {tab === "recetas" && <RecipesPage recipes={recipes} reload={loadRecipes} toast={toast} profiles={profiles} />}
+        {tab === "recetas" && <RecipesPage recipes={recipes} reload={loadRecipes} toast={toast} profiles={profiles} profileId={profile.id} />}
         {tab === "plan" && <Plan profile={profile} recipes={recipes} profiles={profiles} toast={toast} />}
         {tab === "registro" && <Progress profile={profile} toast={toast} />}
         {tab === "perfil" && (

@@ -85,7 +85,16 @@ function PickDish({ open, onClose, recipes, profiles, slot, onPick }) {
    hace una cosa: apuntar lo que falta y tacharlo al comprarlo.
    El teclado no se abre solo: hay que tocar el campo.
    ============================================================ */
-function ShoppingList({ open, onClose, profileId, toast }) {
+/* 18/09/26 */
+const fechaCorta = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const dos = (n) => String(n).padStart(2, "0");
+  return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${String(d.getFullYear()).slice(2)}`;
+};
+
+function ShoppingList({ open, onClose, profileId, profiles = [], toast }) {
+  const nombreDe = (id) => profiles.find((p) => p.id === id)?.name || "";
   const [items, setItems] = useState([]);
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -106,7 +115,10 @@ function ShoppingList({ open, onClose, profileId, toast }) {
     setText("");
     // varias cosas de golpe separadas por coma
     const parts = t.split(",").map((x) => x.trim()).filter(Boolean);
-    setItems((prev) => [...prev, ...parts.map((p, i) => ({ id: `tmp${Date.now()}${i}`, text: p, done: false }))]);
+    setItems((prev) => [...prev, ...parts.map((p, i) => ({
+      id: `tmp${Date.now()}${i}`, text: p, done: false,
+      added_by: profileId, created_at: new Date().toISOString(),
+    }))]);
     try {
       for (const p of parts) await addShoppingItem(p, profileId);
     } catch { toast("No se pudo guardar"); }
@@ -152,10 +164,18 @@ function ShoppingList({ open, onClose, profileId, toast }) {
                 <button onClick={() => toggle(it)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }} aria-label="Marcar">
                   <PixelCheck on={false} />
                 </button>
-                <span className="grow" style={{ fontSize: 16 }}>{it.text}</span>
+                <span className="grow" style={{ fontSize: 16 }}>
+                  {it.text}
+                  {nombreDe(it.added_by) && (
+                    <span className="tiny" style={{ color: "var(--muted-2)", marginLeft: 6, textDecoration: "none", display: "inline-block" }}>
+                      {nombreDe(it.added_by)}
+                    </span>
+                  )}
+                </span>
                 {it.qty && <span className="num tiny dim">{it.qty}</span>}
                 <button className="icon-btn tiny" aria-label="Quitar"
                   onClick={async () => { setItems((p) => p.filter((x) => x.id !== it.id)); await deleteShoppingItem(it.id); }}>✕</button>
+                <span className="num tiny dim" style={{ minWidth: 58, textAlign: "right" }}>{fechaCorta(it.created_at)}</span>
               </div>
             ))}
           </div>
@@ -175,9 +195,17 @@ function ShoppingList({ open, onClose, profileId, toast }) {
                 <button onClick={() => toggle(it)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", lineHeight: 0 }} aria-label="Desmarcar">
                   <PixelCheck on={true} />
                 </button>
-                <span className="grow" style={{ fontSize: 16, textDecoration: "line-through" }}>{it.text}</span>
+                <span className="grow" style={{ fontSize: 16 }}>
+                  <span style={{ textDecoration: "line-through" }}>{it.text}</span>
+                  {nombreDe(it.added_by) && (
+                    <span className="tiny" style={{ color: "var(--muted-2)", marginLeft: 6, textDecoration: "none", display: "inline-block" }}>
+                      {nombreDe(it.added_by)}
+                    </span>
+                  )}
+                </span>
                 <button className="icon-btn tiny" aria-label="Quitar"
                   onClick={async () => { setItems((p) => p.filter((x) => x.id !== it.id)); await deleteShoppingItem(it.id); }}>✕</button>
+                <span className="num tiny dim" style={{ minWidth: 58, textAlign: "right" }}>{fechaCorta(it.created_at)}</span>
               </div>
             ))}
           </div>
@@ -373,7 +401,7 @@ export default function Plan({ profile, recipes, profiles, toast }) {
 
       <ShoppingList
         open={shopping} onClose={() => setShopping(false)}
-        profileId={profile.id} toast={toast}
+        profileId={profile.id} profiles={profiles} toast={toast}
       />
 
     </div>
